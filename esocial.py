@@ -1,4 +1,4 @@
-import os, shutil
+import os, shutil, json
 from tqdm import tqdm
 import xml.dom.minidom as xml
 
@@ -22,20 +22,19 @@ class eSocialXML():
             arquivos = files.copy()
 
         print("Extraindo arquivos obtidos do portal")
-        os.system("del /q "+self.DIRETORIO_XML["todos"])
+        os.system("del /q "+self.DIRETORIO_XML)
         for arquivo in tqdm(arquivos):
             if str(arquivo[-3::]).upper()=="ZIP":
-                shutil.unpack_archive(f"{self.DIRETORIO_DOWNLOADS}\\{arquivo}", self.DIRETORIO_XML["todos"])
+                shutil.unpack_archive(f"{self.DIRETORIO_DOWNLOADS}\\{arquivo}", self.DIRETORIO_XML)
 
     def carregar_informacoes_xml(self):
 
-        for evento in self.EVENTOS:
-            for root, dirs, files in os.walk(self.DIRETORIO_XML):
-                arquivos = files.copy()
+        for root, dirs, files in os.walk(self.DIRETORIO_XML):
+            arquivos = files.copy()
 
         for arquivo in tqdm(arquivos):
             try:
-                doc = xml.parse(self.DIRETORIO_XML["todos"]+"\\"+arquivo)
+                doc = xml.parse(self.DIRETORIO_XML+"\\"+arquivo)
 
                 for eSocial in doc.getElementsByTagName("eSocial"):
                     xmlns = eSocial.getAttribute("xmlns")
@@ -153,14 +152,14 @@ class eSocialXML():
                             
                             if self.verifica_tag(eSocial,"ideBenef","evtPgtos"):
                                 i = 0
-                                while self.extrai_tag(eSocial,"dtPgto","ideBenef",i) != "NULO":
-                                    data_pagamento = self.extrai_tag("dtPgto","infoPgto",i)
-                                    tipo = self.extrai_tag("tpPgto","infoPgto",i)
-                                    periodo = self.extrai_tag("perRef","infoPgto",i)
-                                    identificador = self.extrai_tag("ideDmDev","infoPgto",i)
-                                    valor = self.extrai_tag("vrLiq","infoPgto",i)
+                                while self.extrai_tag(eSocial,"dtPgto","infoPgto",i) != "NULO":
+                                    data_pagamento = self.extrai_tag(eSocial,"dtPgto","infoPgto",i)
+                                    tipo = self.extrai_tag(eSocial,"tpPgto","infoPgto",i)
+                                    periodo = self.extrai_tag(eSocial,"perRef","infoPgto",i)
+                                    identificador = self.extrai_tag(eSocial,"ideDmDev","infoPgto",i)
+                                    valor = self.extrai_tag(eSocial,"vrLiq","infoPgto",i)
 
-                                    lista_pagamentos[rubrica] = {
+                                    lista_pagamentos[data_pagamento] = {
                                         "data_pagamento": data_pagamento,
                                         "tipo": tipo,
                                         "periodo": periodo,
@@ -185,12 +184,79 @@ class eSocialXML():
                         case "evtAltCadastral": pass # S-2205
                         case "evtAltContratual": pass # S-2206
                         case "evtMonit": pass # S-2220
-                        case "evtAfastTemp": pass # S-2230
+                        case "evtAfastTemp": # S-2230
+                            inscricao = self.extrai_tag(doc,"nrInsc")
+                            cpf = self.extrai_tag(doc,"cpfTrab")
+                            inicio_afastamento = self.extrai_tag(doc,"dtIniAfast")
+                            id_evento = eSocial.getElementsByTagName("evtAfastTemp")[0].getAttribute("Id")
+
+                            if(inicio_afastamento!="NULO"):
+                                dicionario_atual = {
+                                    "inscricao" : inscricao,
+                                    "cpf" : cpf,
+                                    "matricula" : self.extrai_tag(doc,"matricula"),
+                                    "data_inicio_afastamento" : inicio_afastamento,
+                                    #"numero_inicio_afastamento" : int(self.formata_data(inicio_afastamento,formato_final="number")),
+                                    "data_termino_afastamento" : self.extrai_tag(doc,"dtTermAfast"),
+                                    "data_inicio_periodo_aquisitivo": self.extrai_tag(doc,"dtInicio","perAquis"),
+                                    "data_fim_periodo_aquisitivo": self.extrai_tag(doc,"dtFim","perAquis"),
+                                    "dias_afastamento": self.extrai_tag(doc,"qtdDiasAfast","infoAtestado"),
+                                    "motivo_afastamento": self.extrai_tag(doc,"codMotAfast"),
+                                    "ID": id_evento
+                                }
+                                self.dicionario_s2230[inscricao+"-"+cpf+"-"+inicio_afastamento+"-I"] = dicionario_atual
+                            else:
+                                termino_afastamento = self.extrai_tag(doc,"dtTermAfast")
+                                dicionario_atual = {
+                                    "inscricao" : inscricao,
+                                    "cpf" : cpf,
+                                    "matricula" : self.extrai_tag(doc,"matricula"),
+                                    "data_termino_afastamento" : self.extrai_tag(doc,"dtTermAfast"),
+                                    #"numero_termino_afastamento" : int(self.formata_data(self.extrai_tag(eSocial,"dtTermAfast"),formato_final="number")),
+                                    "dias_afastamento": self.extrai_tag(doc,"qtdDiasAfast","infoAtestado"),
+                                    "aplicado":"N",
+                                    "ID": id_evento
+                                }
+                                self.dicionario_s2230[inscricao+"-"+cpf+"-"+termino_afastamento+"-T"] = dicionario_atual
                         case "evtExpRisco": pass # S-2240
-                        case "evtDeslig": pass # S-2299
+                        case "evtDeslig": # S-2299
+                            inscricao = self.extrai_tag(doc,"nrInsc")
+                            cpf = self.extrai_tag(doc,"cpfTrab")
+                            id_evento = eSocial.getElementsByTagName("evtDeslig")[0].getAttribute("Id")
+
+                            dicionario_atual = {
+                                "inscricao": inscricao,
+                                "cpf": cpf,
+                                "matricula": self.extrai_tag(doc,"matricula"),
+                                "motivo_desligamento": self.extrai_tag(doc,"mtvDeslig"),
+                                "data_desligamento": self.extrai_tag(doc,"dtDeslig"),
+                                "pagamento_aviso_previo": self.extrai_tag(doc,"indPagtoAPI"),
+                                "data_fim_aviso_previo": self.extrai_tag(doc,"dtProjFimAPI"),
+                                "pensao_alimenticia": self.extrai_tag(doc,"pensAlim"),
+                                "cumprimento_aviso": self.extrai_tag(doc,"indCumprParc"),
+                                "id_evento": id_evento
+                            }
+                            self.dicionario_s2299[inscricao+"-"+cpf] = dicionario_atual
+
                         case "evtTSVInicio": pass # S-2300
                         case "evtTSVAltContr": pass # S-2305
-                        case "evtTSVTermino": pass # S-2399
+                        case "evtTSVTermino": # S-2399
+                            inscricao = self.extrai_tag(eSocial,"nrInsc")
+                            cpf = self.extrai_tag(eSocial,"cpfTrab")
+
+                            dicionario_atual = {
+                                "inscricao": inscricao,
+                                "cpf": cpf,
+                                "matricula": self.extrai_tag(eSocial,"matricula"),
+                                "motivo_desligamento": self.extrai_tag(eSocial,"mtvDeslig"),
+                                "data_desligamento": self.extrai_tag(eSocial,"dtDeslig"),
+                                "pagamento_aviso_previo": self.extrai_tag(eSocial,"indPagtoAPI"),
+                                "data_fim_aviso_previo": self.extrai_tag(eSocial,"dtProjFimAPI"),
+                                "pensao_alimenticia": self.extrai_tag(eSocial,"pensAlim"),
+                                "cumprimento_aviso": self.extrai_tag(eSocial,"indCumprParc")
+                            }
+                            self.dicionario_s2399[inscricao+"-"+cpf] = dicionario_atual
+
                         case "evtExclusao": pass # S-3000
                         case "evtBasesTrab": pass # S-5001
                         case "evtIrrf": pass # S-5002
@@ -202,7 +268,7 @@ class eSocialXML():
                         case "retornoProcessamento": pass # Retorno de envio de evento
 
             except Exception as e:
-                print("Erro:")
+                print(f"Erro:{arquivo}")
                 print(e)
 
     def extrai_tag(self,docXML, tag, tag_superior = '', ocorrencia = 0, ocorrencia_filho = 0, nulo_zero = False):
@@ -232,4 +298,28 @@ class eSocialXML():
             return False  
 
 esocial = eSocialXML("xml")
-esocial.preparar_arquivos_xml()
+esocial.carregar_informacoes_xml()
+
+f = open("s1010.json","w")
+f.write(json.dumps(esocial.dicionario_s1010))
+f.close()
+
+f = open("s1200.json","w")
+f.write(json.dumps(esocial.dicionario_s1200))
+f.close()
+
+f = open("s1210.json","w")
+f.write(json.dumps(esocial.dicionario_s1210))
+f.close()
+
+f = open("s2230.json","w")
+f.write(json.dumps(esocial.dicionario_s2230))
+f.close()
+
+f = open("s2299.json","w")
+f.write(json.dumps(esocial.dicionario_s2299))
+f.close()
+
+f = open("s2399.json","w")
+f.write(json.dumps(esocial.dicionario_s2399))
+f.close()
