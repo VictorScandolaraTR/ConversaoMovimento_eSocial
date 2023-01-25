@@ -1,12 +1,17 @@
-import os, json
-from classes.esocial import eSocialXML
+import os, json, sys
+sys.path.append(sys.path[0]+"\\src")
+from src.esocial import eSocialXML
 
 os.system("cls")
 esocial = eSocialXML("xml")
 esocial.carregar_informacoes_xml()
+esocial.configura_conexao_dominio("movto_esocial","EXTERNO","123456")
 
-f = open("s1010.json","w")
-f.write(json.dumps(esocial.dicionario_s1010))
+print(type(esocial.relaciona_empresas()))
+print(esocial.relaciona_empresas())
+
+'''f = open("s1010.json","w")
+f.write(json.dumps(esocial.processar_rubricas()))
 f.close()
 
 f = open("s1200.json","w")
@@ -27,4 +32,4 @@ f.close()
 
 f = open("s2399.json","w")
 f.write(json.dumps(esocial.dicionario_s2399))
-f.close()
+f.close()'''
