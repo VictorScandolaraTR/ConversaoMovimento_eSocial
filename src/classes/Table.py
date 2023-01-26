@@ -1,6 +1,6 @@
 from sqlite3 import connect
 import sys
-from utils.functions import remove_caracter_out_of_cp1252
+from src.utils.functions import remove_caracter_out_of_cp1252
 
 class Table:
 
@@ -9,8 +9,7 @@ class Table:
 
 
     def init(self, table):
-
-        connection = connect(sys.path[-1]+'\\database\\def.db')
+        connection = connect('.\\src\\database\\def.db')
         cursor = connection.cursor()
         cursor.execute(f'select * from {table}')
 

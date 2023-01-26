@@ -1,5 +1,4 @@
 import os, json, sys
-sys.path.append(sys.path[0]+"\\src")
 from src.esocial import eSocialXML
 
 os.system("cls")
@@ -9,6 +8,8 @@ esocial.configura_conexao_dominio("movto_esocial","EXTERNO","123456")
 
 print(type(esocial.relaciona_empresas()))
 print(esocial.relaciona_empresas())
+
+esocial.gerar_afastamentos_importacao()
 
 '''f = open("s1010.json","w")
 f.write(json.dumps(esocial.processar_rubricas()))

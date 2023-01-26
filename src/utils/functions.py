@@ -3,6 +3,7 @@ import re
 import tempfile
 import shutil
 import chardet
+from datetime import datetime, timedelta
 
 def print_to_import(output_file, data):
     """
@@ -102,3 +103,81 @@ def remove_caracter_out_of_cp1252(string):
         except:
             pass
     return retorno
+
+
+def format_date(date, date_format):
+    try:
+        return datetime.strptime(date, date_format)
+    except:
+        return None
+
+
+def transform_date(date, old_format, new_format):
+    """
+    Mudar formato de uma data
+    """
+    try:
+        return datetime.strftime(format_date(date, old_format), new_format)
+    except:
+        return None
+
+
+def convert_date(str_date, date_format, default_value_error='NULO'):
+    """
+    Converter uma String para data
+    """
+    try:
+        if isinstance(str_date, str):
+            return datetime.strptime(str_date, date_format).date()
+        else:
+            return str_date.date()
+    except:
+        return default_value_error
+
+
+def is_null(field, check_int=False, date=False):
+    """
+    Verifica se o valor presente no campo é válido ou não
+    """
+    result = False
+    if type(field) == str:
+        if str(field).strip().upper() == '':
+            result = True
+        elif str(field).strip().upper() == 'NULO':
+            result = True
+        elif str(field).strip().upper() == 'NULL':
+            result = True
+
+    if field == None:
+        result = True
+
+    if field == False:
+        result = True
+
+    if check_int:
+        try:
+            if int(field) == 0:
+                return True
+        except:
+            return True
+
+    if date:
+        if field == '01/01/1900':
+            return True
+
+    return result
+
+
+def add_day_to_date(str_date, date_format, days, default_value_error='NULO'):
+    """
+    Adiciona dias(int) a uma string de data e retorna uma string no formato DD/MM/YYYY
+    """
+    try:
+        new_date = default_value_error
+        if not is_null(str_date):
+            date = convert_date(str_date, date_format)
+            new_date = (date + timedelta(days=days)).strftime("%d/%m/%Y")
+
+        return new_date
+    except:
+        return default_value_error
