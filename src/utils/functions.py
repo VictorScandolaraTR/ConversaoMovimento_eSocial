@@ -4,6 +4,7 @@ import tempfile
 import shutil
 import chardet
 from datetime import datetime, timedelta
+import json
 
 def print_to_import(output_file, data):
     """
@@ -112,14 +113,14 @@ def format_date(date, date_format):
         return None
 
 
-def transform_date(date, old_format, new_format):
+def transform_date(date, old_format, new_format, default_value_error=None):
     """
     Mudar formato de uma data
     """
     try:
         return datetime.strftime(format_date(date, old_format), new_format)
     except:
-        return None
+        return default_value_error
 
 
 def convert_date(str_date, date_format, default_value_error='NULO'):
@@ -181,3 +182,43 @@ def add_day_to_date(str_date, date_format, days, default_value_error='NULO'):
         return new_date
     except:
         return default_value_error
+
+
+def get_keys(key):
+    """
+    Retorna valores do arquivo depara.json
+    """
+    with open('.\\src\\database\\depara.json') as file:
+        dicionario = json.load(file)
+
+    if str(key).upper() in dicionario.keys():
+        return dicionario[str(key).upper()]
+    elif str(key).lower() in dicionario.keys():
+        return dicionario[str(key).lower()]
+    elif str(key).capitalize() in dicionario.keys():
+        return dicionario[str(key).capitalize()]
+    else:
+        return False
+
+
+def get_current_day():
+    """
+    Retorna a data atual
+    """
+    return datetime.today()
+
+
+def difference_between_dates(str_start_date, str_end_date, date_format):
+    """
+    Retorna a diferença em dias entre duas datas
+    """
+    result = False
+    if not is_null(str_start_date) and not is_null(str_end_date):
+        start_date = convert_date(str_start_date, date_format)
+        end_date = convert_date(str_end_date, date_format)
+        if end_date < start_date:
+            result = 0
+        else:
+            result = abs((start_date - end_date).days)
+
+    return result

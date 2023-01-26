@@ -5,6 +5,7 @@ import xml.dom.minidom as xml
 import pandas as pd
 
 from src.classes.Table import Table
+from src.classes.StorageData import StorageData
 from src.utils.functions import *
 
 class eSocialXML():
@@ -615,10 +616,114 @@ class eSocialXML():
         Gera o arquivo FOAFASTAMENTOS_IMPORTACAO
         """
         data_foafastamentos_importacao = []
+        data_afastamentos_xml_incompleto = StorageData()
+        data_afastamentos_xml = StorageData()
+
+        # Podem vir afastamentos onde a data de início está em um XML e a
+        # data fim em outro, dessa forma precisamos organizar os dados e encontrar
+        # os respectivos inicio e fim
+        for s2230 in self.dicionario_s2230:
+            cnpj_empregador = self.dicionario_s2230[s2230].get('ideEmpregador').get('nrInsc')
+            cpf_empregado = self.dicionario_s2230[s2230].get('ideVinculo').get('cpfTrab')
+
+            data_inicio = ''
+            data_fim = ''
+
+            infos_afastamento = self.dicionario_s2230[s2230].get('infoAfastamento')
+            if infos_afastamento.get('iniAfastamento') is not None:
+                if infos_afastamento.get('iniAfastamento').get('dtIniAfast') is not None:
+                    data_inicio = infos_afastamento.get('iniAfastamento').get('dtIniAfast')
+
+            if infos_afastamento.get('fimAfastamento') is not None:
+                if infos_afastamento.get('fimAfastamento').get('dtTermAfast') is not None:
+                    data_fim = infos_afastamento.get('fimAfastamento').get('dtTermAfast')
+
+            if not is_null(data_inicio) and not is_null(data_fim):
+                data_afastamentos_xml.add(infos_afastamento, [cnpj_empregador, cpf_empregado, data_inicio])
+            if is_null(data_fim):
+                # print(cpf_empregado, data_inicio, infos_afastamento)
+                data_afastamentos_xml_incompleto.add(infos_afastamento, [cnpj_empregador, cpf_empregado, 'INICIO', data_inicio])
+            if is_null(data_inicio):
+                data_afastamentos_xml_incompleto.add(infos_afastamento, [cnpj_empregador, cpf_empregado, 'FIM', data_fim])
+
+        # Para cada afastamento sem data fim, pega o primeiro fim que for posterior ao início
+        for cnpj_empregador in data_afastamentos_xml_incompleto.get_all_dict():
+            for cpf_empregado in data_afastamentos_xml_incompleto.get([cnpj_empregador]):
+
+                # ordendar datas de início
+                datas_inicio_ordenadas = []
+                for data_inicio in data_afastamentos_xml_incompleto.get([cnpj_empregador, cpf_empregado, 'INICIO']):
+                    datas_inicio_ordenadas.append(convert_date(data_inicio, '%Y-%m-%d'))
+                datas_inicio_ordenadas.sort()
+
+                # ordenar datas fim
+                datas_fim_ordenadas = []
+                for data_fim in data_afastamentos_xml_incompleto.get([cnpj_empregador, cpf_empregado, 'FIM']):
+                    datas_fim_ordenadas.append(convert_date(data_fim, '%Y-%m-%d'))
+
+                datas_fim_ordenadas.sort()
+
+                # Tenta encontrar a data fim para o afastamento
+                for data_inicio_formatada in datas_inicio_ordenadas:
+                    data_inicio_string = data_inicio_formatada.strftime('%Y-%m-%d')
+                    infos_afastamento = data_afastamentos_xml_incompleto.get([cnpj_empregador, cpf_empregado, 'INICIO', data_inicio_string])
+
+                    end_date_found = False
+                    for data_fim_formatada in datas_fim_ordenadas:
+                        data_fim_string = data_fim_formatada.strftime('%Y-%m-%d')
+                        if data_inicio_formatada < data_fim_formatada:
+                            infos_fim = data_afastamentos_xml_incompleto.get([cnpj_empregador, cpf_empregado, 'FIM', data_fim_string])
+
+                            if not is_null(infos_fim):
+                                infos_afastamento.update(infos_fim)
+                                data_afastamentos_xml.add(infos_afastamento, [cnpj_empregador, cpf_empregado, data_inicio_string])
+                                data_afastamentos_xml_incompleto.overwrite('', [cnpj_empregador, cpf_empregado, 'FIM', data_fim_string])
+                                end_date_found = True
+                                break
+
+                    if not end_date_found:
+                        data_afastamentos_xml.add(infos_afastamento, [cnpj_empregador, cpf_empregado, data_inicio_string])
 
         # afastamentos temporários
-        for line in self.dicionario_s2230:
-            print(line)
+        for cnpj_empregador in data_afastamentos_xml.get_all_dict():
+            for cpf_empregado in data_afastamentos_xml.get([cnpj_empregador]):
+                for data_inicio in data_afastamentos_xml.get([cnpj_empregador, cpf_empregado]):
+                    infos_afastamento = data_afastamentos_xml.get([cnpj_empregador, cpf_empregado, data_inicio])
+                    codi_emp = '1'
+                    i_empregados = '1'
+
+                    data_fim = ''
+                    if infos_afastamento.get('fimAfastamento') is not None:
+                        data_fim = infos_afastamento.get('fimAfastamento').get('dtTermAfast')
+
+                    cod_motivo_esocial = infos_afastamento.get('iniAfastamento').get('codMotAfast')
+                    motivos_esocial = get_keys('motivos_afastamentos_esocial')
+
+                    if cod_motivo_esocial in motivos_esocial:
+                        motivo = motivos_esocial.get(cod_motivo_esocial)
+                    else:
+                        continue
+
+                    # afastamento por doença ou acidente de trabalho tem o mesmo código no eSocial
+                    # e no Domínio depende da quantidade de dias
+                    if motivo in ['03', '06']:
+                        if is_null(data_fim):
+                            data_fim = get_current_day()
+
+                    if difference_between_dates(data_inicio, data_fim, '%Y-%m-%d') <= 15:
+                        if motivo == '03':
+                            motivo = '17'
+                        elif motivo == '06':
+                            motivo = '18'
+
+                    table = Table('FOAFASTAMENTOS_IMPORTACAO')
+
+                    table.set_value('CODI_EMP', codi_emp)
+                    table.set_value('I_EMPREGADOS', cpf_empregado)
+                    table.set_value('I_AFASTAMENTOS', motivo)
+                    table.set_value('DATA_REAL', transform_date(data_inicio, '%Y-%m-%d', '%d/%m/%Y'))
+                    table.set_value('DATA_FIM', transform_date(data_fim, '%Y-%m-%d', '%d/%m/%Y', default_value_error='NULO'))
+                    data_foafastamentos_importacao.append(table.do_output())
 
         # demissões empregados
         for s2299 in self.dicionario_s2299:
