@@ -6,6 +6,7 @@ import pandas as pd
 
 from src.classes.Table import Table
 from src.classes.StorageData import StorageData
+from src.classes.Sequencial import Sequencial
 from src.utils.functions import *
 
 class eSocialXML():
@@ -762,6 +763,51 @@ class eSocialXML():
         """
         data_foferias_aquisitivos = []
         data_foferias_gozo = []
+
+        sequencial_aquisitivos = Sequencial()
+        check_aquisitivos = StorageData()
+        for s2230 in self.dicionario_s2230:
+            infos_afastamento = self.dicionario_s2230[s2230].get("infoAfastamento")
+            motivo = infos_afastamento.get('iniAfastamento').get("codMotAfast")
+
+            # Afastamentos de férias é código 15 no eSocial
+            if motivo != '15': continue
+
+            codi_emp = '1'
+            i_empregados = '1'
+
+            data_inicio_aquisitivo = ''
+            data_fim_aquisitivo = ''
+            if infos_afastamento.get('iniAfastamento').get('perAquis') is not None:
+                data_inicio_aquisitivo = infos_afastamento.get('iniAfastamento').get('perAquis').get('dtInicio')
+                data_fim_aquisitivo = infos_afastamento.get('iniAfastamento').get('perAquis').get('dtFim')
+
+            # ignora se não houver inicio e fim do aquisitivo
+            if is_null(data_inicio_aquisitivo) or is_null(data_fim_aquisitivo): continue
+
+            i_ferias_aquisitivos = sequencial_aquisitivos.add([codi_emp, i_empregados])
+            limite_para_gozo = add_year_to_date(data_inicio_aquisitivo, 2, '%Y-%m-%d')
+
+            if not check_aquisitivos.exist([codi_emp, i_empregados, data_inicio_aquisitivo]):
+                table = Table('FOFERIAS_AQUISITIVOS')
+                table.set_value('CODI_EMP', codi_emp)
+                table.set_value('I_EMPREGADOS', i_empregados)
+                table.set_value('I_FERIAS_AQUISITIVOS', i_ferias_aquisitivos)
+                table.set_value('DATA_INICIO', transform_date(data_inicio_aquisitivo, '%Y-%m-%d', '%d/%m/%Y'))
+                table.set_value('DATA_FIM', transform_date(data_fim_aquisitivo, '%Y-%m-%d', '%d/%m/%Y'))
+                table.set_value('SITUACAO', 1)
+                table.set_value('AFAST_PREVIDENCIA', 0)
+                table.set_value('AFAST_SEM_REMUNERACAO', 0)
+                table.set_value('AFAST_COM_REMUNERACAO', 0)
+                table.set_value('DIAS_FALTAS', 0)
+                table.set_value('DIAS_DIREITO', 30)
+                table.set_value('DIAS_GOZADOS', 0)
+                table.set_value('DIAS_ABONO', 0)
+                table.set_value('AVOS_ADQUIRIDOS', 12)
+                table.set_value('LIMITE_PARA_GOZO', limite_para_gozo)
+
+                data_foferias_aquisitivos.append(table.do_output())
+                check_aquisitivos.add(i_ferias_aquisitivos, [codi_emp, i_empregados, data_inicio_aquisitivo])
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_AQUISITIVOS.txt', data_foferias_aquisitivos)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_GOZO.txt', data_foferias_gozo)

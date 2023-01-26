@@ -4,6 +4,7 @@ import tempfile
 import shutil
 import chardet
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 import json
 
 def print_to_import(output_file, data):
@@ -222,3 +223,15 @@ def difference_between_dates(str_start_date, str_end_date, date_format):
             result = abs((start_date - end_date).days)
 
     return result
+
+
+def add_year_to_date(str_date, years, date_format, default_value_error='NULO'):
+    """
+    Adiciona anos(int) a uma string de data no formato DD/MM/YYYY
+    Retorna uma string no formato DD/MM/YYYY
+    """
+    try:
+        date = convert_date(str_date, date_format)
+        return (date + relativedelta(years=int(years))).strftime("%d/%m/%Y")
+    except:
+        return default_value_error

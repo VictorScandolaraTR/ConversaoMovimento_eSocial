@@ -1,43 +1,27 @@
 class Sequencial:
-    
+
     def __init__(self):
         self.__sequencial = {}
     
     def add(self, keys=[]):
+        auxiliary_data = self.__sequencial
+        for key in keys[:-1]:
+            auxiliary_data = auxiliary_data.setdefault(key, {})
+
+        auxiliary_data[keys[-1]] = auxiliary_data.get(keys[-1], 0) + 1
+
+        return auxiliary_data[keys[-1]]
+
+    def get(self, keys=[]):
         value = 0
-        if len(keys) == 1:
-            if keys[0] not in self.__sequencial.keys():
-                self.__sequencial[keys[0]] = 1
-            else:
-                self.__sequencial[keys[0]] += 1
-            
-            value = self.__sequencial[keys[0]]
+        auxiliary_data = self.__sequencial
+        number_keys = len(keys)
+        number_existing_keys = 0
+        for key in keys:
+            if key in auxiliary_data.keys():
+                auxiliary_data = auxiliary_data[key]
+                number_existing_keys += 1
+                if number_keys == number_existing_keys:
+                    value = auxiliary_data
 
-        elif len(keys) == 2:
-            if keys[0] not in self.__sequencial.keys():
-                self.__sequencial[keys[0]] = {}
-
-            if keys[1] not in self.__sequencial[keys[0]].keys():
-                self.__sequencial[keys[0]][keys[1]] = 1
-            else:
-                self.__sequencial[keys[0]][keys[1]] += 1
-            
-            value = self.__sequencial[keys[0]][keys[1]]
-
-        elif len(keys) == 3:
-            if keys[0] not in self.__sequencial.keys():
-                self.__sequencial[keys[0]] = {}
-
-            if keys[1] not in self.__sequencial[keys[0]].keys():
-                self.__sequencial[keys[0]][keys[1]] = {}
-            else:
-                self.__sequencial[keys[0]][keys[1]] += 1
-
-            if keys[2] not in self.__sequencial[keys[0]][keys[1]].keys():
-                self.__sequencial[keys[0]][keys[1]][keys[2]] = 1
-            else:
-                self.__sequencial[keys[0]][keys[1]][keys[2]] += 1
-            
-            value = self.__sequencial[keys[0]][keys[1]][keys[2]]
-        
         return value
