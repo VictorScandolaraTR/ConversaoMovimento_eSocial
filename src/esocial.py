@@ -765,6 +765,7 @@ class eSocialXML():
         data_foferias_gozo = []
 
         sequencial_aquisitivos = Sequencial()
+        sequencial_gozos = Sequencial()
         check_aquisitivos = StorageData()
         for s2230 in self.dicionario_s2230:
             infos_afastamento = self.dicionario_s2230[s2230].get("infoAfastamento")
@@ -785,10 +786,11 @@ class eSocialXML():
             # ignora se não houver inicio e fim do aquisitivo
             if is_null(data_inicio_aquisitivo) or is_null(data_fim_aquisitivo): continue
 
-            i_ferias_aquisitivos = sequencial_aquisitivos.add([codi_emp, i_empregados])
             limite_para_gozo = add_year_to_date(data_inicio_aquisitivo, 2, '%Y-%m-%d')
 
             if not check_aquisitivos.exist([codi_emp, i_empregados, data_inicio_aquisitivo]):
+                i_ferias_aquisitivos = sequencial_aquisitivos.add([codi_emp, i_empregados])
+
                 table = Table('FOFERIAS_AQUISITIVOS')
                 table.set_value('CODI_EMP', codi_emp)
                 table.set_value('I_EMPREGADOS', i_empregados)
@@ -808,6 +810,61 @@ class eSocialXML():
 
                 data_foferias_aquisitivos.append(table.do_output())
                 check_aquisitivos.add(i_ferias_aquisitivos, [codi_emp, i_empregados, data_inicio_aquisitivo])
+
+            data_inicio_gozo = ''
+            data_fim_gozo = ''
+            if infos_afastamento.get('iniAfastamento') is not None:
+                data_inicio_gozo = infos_afastamento.get('iniAfastamento').get('dtIniAfast')
+
+            if infos_afastamento.get('fimAfastamento') is not None:
+                data_fim_gozo = infos_afastamento.get('fimAfastamento').get('dtTermAfast')
+
+            # ignora se não houver inicio e fim do aquisitivo
+            if is_null(data_inicio_gozo) or is_null(data_fim_gozo): continue
+
+            i_ferias_gozo = sequencial_gozos.add([codi_emp, i_empregados])
+            i_ferias_aquisitivos = check_aquisitivos.get([codi_emp, i_empregados, data_inicio_aquisitivo])
+
+            # Falta encontrar no XML
+            abono_inicio = ''
+            abono_fim = ''
+            data_pagamento = ''
+
+            abono_paga = 'N'
+            if not is_null(abono_inicio) and not is_null(abono_fim):
+                abono_paga = 'S'
+
+            # campos decimais
+            gozo_inicio_dn = f"{difference_between_dates('1900-01-01', data_inicio_gozo, '%Y-%m-%d')}.00"
+            gozo_fim_dn = f"{difference_between_dates('1900-01-01', data_fim_gozo, '%Y-%m-%d')}.99"
+
+            abono_inicio_dn = '0.00'
+            abono_fim_dn = '0.00'
+            if abono_paga == 'S':
+                abono_inicio_dn = f"{difference_between_dates('1900-01-01', abono_inicio, '%Y-%m-%d')}.00"
+                abono_fim_dn = difference_between_dates(abono_fim, '1900-01-01', '%Y-%m-%d')
+
+            table = Table('FOFERIAS_GOZO')
+            table.set_value('CODI_EMP', codi_emp)
+            table.set_value('I_EMPREGADOS', i_empregados)
+            table.set_value('I_FERIAS_GOZO', i_ferias_gozo)
+            table.set_value('I_FERIAS_AQUISITIVOS', i_ferias_aquisitivos)
+            table.set_value('GOZO_INICIO', transform_date(data_inicio_gozo, '%Y-%m-%d', '%d/%m/%Y'))
+            table.set_value('GOZO_FIM', transform_date(data_fim_gozo, '%Y-%m-%d', '%d/%m/%Y'))
+            table.set_value('ABONO_PAGA', abono_paga)
+            table.set_value('ABONO_INICIO', abono_inicio)
+            table.set_value('ABONO_FIM', abono_fim)
+            table.set_value('DATA_PAGTO', data_pagamento)
+            table.set_value('PAGA_AD13', '')
+            table.set_value('TIPO', '1')
+            table.set_value('GOZO_INICIO_DN', gozo_inicio_dn)
+            table.set_value('GOZO_FIM_DN', gozo_fim_dn)
+            table.set_value('ABONO_INICIO_DN', abono_inicio_dn)
+            table.set_value('ABONO_FIM_DN', abono_fim_dn)
+            table.set_value('INICIO_AQUISITIVO', transform_date(data_inicio_aquisitivo, '%Y-%m-%d', '%d/%m/%Y'))
+            table.set_value('FIM_AQUISITIVO', transform_date(data_fim_aquisitivo, '%Y-%m-%d', '%d/%m/%Y'))
+
+            data_foferias_gozo.append(table.do_output())
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_AQUISITIVOS.txt', data_foferias_aquisitivos)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_GOZO.txt', data_foferias_gozo)
