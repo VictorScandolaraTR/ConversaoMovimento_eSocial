@@ -615,29 +615,36 @@ class eSocialXML():
         Gera o arquivo FOAFASTAMENTOS_IMPORTACAO
         """
         data_foafastamentos_importacao = []
+
         # afastamentos temporários
         for line in self.dicionario_s2230:
             print(line)
 
         # demissões empregados
         for s2299 in self.dicionario_s2299:
+            codi_emp = '1'
+            i_empregados = '1'
+
             data_desligamento = self.dicionario_s2299[s2299].get("infoDeslig").get("dtDeslig")
             data_real_demissao = add_day_to_date(data_desligamento, '%Y-%m-%d', 1)
             table = Table('FOAFASTAMENTOS_IMPORTACAO')
 
-            table.set_value('CODI_EMP', '1')
-            table.set_value('I_EMPREGADOS', '1')
+            table.set_value('CODI_EMP', codi_emp)
+            table.set_value('I_EMPREGADOS', i_empregados)
             table.set_value('I_AFASTAMENTOS', 8)
             table.set_value('DATA_REAL', data_real_demissao)
             data_foafastamentos_importacao.append(table.do_output())
 
         # demissões contribuintes
         for s2399 in self.dicionario_s2399:
+            codi_emp = '1'
+            i_empregados = '1'
+
             data_demissao = self.dicionario_s2399[s2399].get("infoTSVTermino").get("dtTerm")
             table = Table('FOAFASTAMENTOS_IMPORTACAO')
 
-            table.set_value('CODI_EMP', '1')
-            table.set_value('I_EMPREGADOS', '1')
+            table.set_value('CODI_EMP', codi_emp)
+            table.set_value('I_EMPREGADOS', i_empregados)
             table.set_value('I_AFASTAMENTOS', 8)
             table.set_value('DATA_REAL', transform_date(data_demissao, '%Y-%m-%d', '%d/%m/%Y'))
             data_foafastamentos_importacao.append(table.do_output())
