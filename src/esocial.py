@@ -719,7 +719,7 @@ class eSocialXML():
                     table = Table('FOAFASTAMENTOS_IMPORTACAO')
 
                     table.set_value('CODI_EMP', codi_emp)
-                    table.set_value('I_EMPREGADOS', cpf_empregado)
+                    table.set_value('I_EMPREGADOS', i_empregados)
                     table.set_value('I_AFASTAMENTOS', motivo)
                     table.set_value('DATA_REAL', transform_date(data_inicio, '%Y-%m-%d', '%d/%m/%Y'))
                     table.set_value('DATA_FIM', transform_date(data_fim, '%Y-%m-%d', '%d/%m/%Y', default_value_error='NULO'))
@@ -755,3 +755,13 @@ class eSocialXML():
             data_foafastamentos_importacao.append(table.do_output())
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOAFASTAMENTOS_IMPORTACAO.txt', data_foafastamentos_importacao)
+
+    def gerar_ferias_importacao(self):
+        """
+        Gera os arquivos FOFERIAS_AQUISITIVOS e FOFERIAS_GOZO
+        """
+        data_foferias_aquisitivos = []
+        data_foferias_gozo = []
+
+        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_AQUISITIVOS.txt', data_foferias_aquisitivos)
+        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_GOZO.txt', data_foferias_gozo)

@@ -10,6 +10,7 @@ print(type(esocial.relaciona_empresas()))
 print(esocial.relaciona_empresas())
 
 esocial.gerar_afastamentos_importacao()
+esocial.gerar_ferias_importacao()
 
 '''f = open("s1010.json","w")
 f.write(json.dumps(esocial.processar_rubricas()))
