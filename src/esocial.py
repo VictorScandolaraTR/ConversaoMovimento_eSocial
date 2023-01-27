@@ -12,6 +12,7 @@ class eSocialXML():
         self.DIRETORIO_DOWNLOADS = f"{diretorio_xml}\\downloads"
         self.DIRETORIO_SAIDA = f"{diretorio_xml}\\saida"
 
+        self.dicionario_rubricas_dominio = {} # Rubricas Domínio
         self.dicionario_s1010 = {} # Rubricas
         self.dicionario_s1200 = {} # Remuneração Regime Previdenciário Geral
         self.dicionario_s1202 = {} # Remuneração Regime Previdenciário Próprio
@@ -271,11 +272,6 @@ class eSocialXML():
         result = []
         tipo = ""
         
-        engine = create_engine("sybase+pyodbc://{user}:{pw}@{dsn}".format(user=self.usuario_dominio, pw=self.senha_dominio, dsn=self.base_dominio))
-        
-        sql = f"SELECT * FROM BETHADBA.FOEVENTOS WHERE CODI_EMP = {self.empresa_padrao_rubricas}"
-        df_rubricas = pd.read_sql(sql,con=engine)
-
         info_rubrica = rubrica.get('infoRubrica').get('inclusao').get('dadosRubrica')
 
         match int(info_rubrica.get('tpRubr')):
@@ -291,36 +287,36 @@ class eSocialXML():
         tpbasefgts = info_rubrica.get('codIncFGTS')
         tpbasesindical = info_rubrica.get('codIncSIND')
 
-        for i in range(len(df_rubricas)):
-            if(tipo==df_rubricas.loc[i,"prov_desc"]):
-                if str(rubesocial) in str(df_rubricas.loc[i,'NATUREZA_FOLHA_MENSAL']):
-                    if str(tpbaseinss) in str(df_rubricas.loc[i,'CODIGO_INCIDENCIA_INSS_ESOCIAL']):
-                        if str(tpbaseirrf) in str(df_rubricas.loc[i,'CODIGO_INCIDENCIA_IRRF_ESOCIAL']):
-                            if str(tpbasefgts) in str(df_rubricas.loc[i,'CODIGO_INCIDENCIA_FGTS_ESOCIAL']):
+        for rubrica in self.dicionario_rubricas_dominio:
+            if(tipo==self.dicionario_rubricas_dominio.get(rubrica).get("tipo")):
+                if(rubesocial==self.dicionario_rubricas_dominio.get(rubrica).get("rubesocial")):
+                    if(tpbaseinss==self.dicionario_rubricas_dominio.get(rubrica).get("tpbaseinss")):
+                        if(tpbaseirrf==self.dicionario_rubricas_dominio.get(rubrica).get("tpbaseirrf")):
+                            if(tpbasefgts==self.dicionario_rubricas_dominio.get(rubrica).get("tpbasefgts")):
                                 if(tpbasesindical):
-                                    if str(tpbasesindical) in str(df_rubricas.loc[i,'CODIGO_INCIDENCIA_SINDICAL_ESOCIAL']):
-                                        result.append(str(df_rubricas.loc[i,'i_eventos']))
+                                    if(tpbasesindical==self.dicionario_rubricas_dominio.get(rubrica).get("tpbasesindical")):
+                                        result.append(str(self.dicionario_rubricas_dominio.get(rubrica).get("i_eventos")))
                                 else:
-                                    result.append(str(df_rubricas.loc[i,'i_eventos']))
+                                    result.append(str(self.dicionario_rubricas_dominio.get(rubrica).get("i_eventos")))
 
         if(len(result)==0):
             # Comparação através do algoritmo de Levenshtein
             menor_distancia_levenshtein = 50
                     
-            for i in range(len(df_rubricas)):
+            for rubrica in self.dicionario_rubricas_dominio:
                 distancia_levenshtein = Levenshtein.distance(
                     descricao.upper(),
-                    str(df_rubricas.loc[i,'nome'])
+                    str(self.dicionario_rubricas_dominio.get(rubrica).get("nome"))
                 )
 
                 if (distancia_levenshtein < menor_distancia_levenshtein):
                     menor_distancia_levenshtein = distancia_levenshtein
                     lista_relacoes_levenshtein = []
                     if(menor_distancia_levenshtein<3):
-                        lista_relacoes_levenshtein.append(str(df_rubricas.loc[i,'i_eventos']))
+                        lista_relacoes_levenshtein.append(str(self.dicionario_rubricas_dominio.get(rubrica).get("i_eventos")))
                 elif (distancia_levenshtein==menor_distancia_levenshtein):
                     if(menor_distancia_levenshtein<3):
-                        lista_relacoes_levenshtein.append(str(df_rubricas.loc[i,'i_eventos']))
+                        lista_relacoes_levenshtein.append(str(self.dicionario_rubricas_dominio.get(rubrica).get("i_eventos")))
 
             for relacao in lista_relacoes_levenshtein:
                 result.append(str(relacao))
@@ -348,6 +344,38 @@ class eSocialXML():
         cnpj = ''.join([str(item) for item in novo])
         return cnpj
 
+    def carregar_rubricas_dominio(self):
+        '''Carrega rubricas'''
+
+        self.dicionario_rubricas_dominio = {}
+        engine = create_engine("sybase+pyodbc://{user}:{pw}@{dsn}".format(user=self.usuario_dominio, pw=self.senha_dominio, dsn=self.base_dominio))
+        
+        sql = f"SELECT * FROM BETHADBA.FOEVENTOS WHERE CODI_EMP = {self.empresa_padrao_rubricas}"
+        df_rubricas = pd.read_sql(sql,con=engine)
+
+        for i in range(len(df_rubricas)):
+            i_eventos = str(df_rubricas.loc[i,'i_eventos'])
+            nome = df_rubricas.loc[i,"nome"]
+            tipo = df_rubricas.loc[i,"prov_desc"]
+            rubesocial = str(df_rubricas.loc[i,'NATUREZA_FOLHA_MENSAL'])
+            tpbaseinss = str(df_rubricas.loc[i,'CODIGO_INCIDENCIA_INSS_ESOCIAL'])
+            tpbaseirrf = str(df_rubricas.loc[i,'CODIGO_INCIDENCIA_IRRF_ESOCIAL'])
+            tpbasefgts = str(df_rubricas.loc[i,'CODIGO_INCIDENCIA_FGTS_ESOCIAL'])
+            tpbasesindical = str(df_rubricas.loc[i,'CODIGO_INCIDENCIA_SINDICAL_ESOCIAL'])
+
+            rubrica = {
+                "i_eventos": i_eventos,
+                "nome": nome,
+                "tipo": tipo,
+                "rubesocial": rubesocial,
+                "tpbaseinss": tpbaseinss,
+                "tpbaseirrf": tpbaseirrf,
+                "tpbasefgts": tpbasefgts,
+                "tpbasesindical": tpbasesindical
+            }
+
+            self.dicionario_rubricas_dominio[i_eventos] = rubrica
+    
     def gera_excel_relacao(self):
         '''Gera o excel com as rubricas para relacionar com as rubricas padrão do Domínio'''
 
@@ -357,6 +385,8 @@ class eSocialXML():
         linhas_excel_multirelacionado = set()
         relacao_dominio_esocial = {}
         lista_rubricas = []
+
+        self.carregar_rubricas_dominio()
         
         print("Relacionando rubricas")
         for s1010 in tqdm(self.dicionario_s1010):
@@ -412,6 +442,7 @@ class eSocialXML():
                     relacao_dominio_esocial[lista_relacoes[0]].append(s1010)
                     
                 elif(len(lista_relacoes)>1):
+                    print("Multi-relações")
                     linha = [
                         codigo,
                         nome,
@@ -450,7 +481,7 @@ class eSocialXML():
             if(len(relacao_dominio_esocial[relacao])>1):
                 for rubrica in relacao_dominio_esocial[relacao]:
                     codigo = self.dicionario_s1010[rubrica]['infoRubrica']['inclusao']['ideRubrica']['codRubr']
-                    info_rubrica = self.dicionario_s1010[rubrica]['infoRubrica']['inclusao']['dadosRubrica']
+                    info_rubrica = self.dicionario_s1010.get(rubrica).get("infoRubrica").get("inclusao").get("dadosRubrica")
 
                     match int(info_rubrica['tpRubr']):
                         case 1: tipo = "P"
@@ -458,12 +489,12 @@ class eSocialXML():
                         case 3: tipo = "I"
                         case 4: tipo = "ID"
                     
-                    nome = info_rubrica['dscRubr']
-                    rubesocial = info_rubrica['natRubr']
-                    tpbaseinss = info_rubrica['codIncCP']
-                    tpbaseirrf = info_rubrica['codIncIRRF']
-                    tpbasefgts = info_rubrica['codIncFGTS']
-                    tpbasesindical = info_rubrica['codIncSIND']
+                    nome = info_rubrica.get("dscRubr")
+                    rubesocial = info_rubrica.get("natRubr")
+                    tpbaseinss = info_rubrica.get("codIncCP")
+                    tpbaseirrf = info_rubrica.get("codIncIRRF")
+                    tpbasefgts = info_rubrica.get("codIncFGTS")
+                    tpbasesindical = info_rubrica.get("codIncSIND")
 
                     linhas_excel_alerta.add((
                         codigo,
@@ -532,124 +563,128 @@ class eSocialXML():
         style_default = workbook.add_format()
         style_default.set_align('center')
 
-        try:
-            df1 = pd.DataFrame(data1)
-            df1.columns = header1
-            column_sort = header1[0]
-            df1 = df1.sort_values(by=[column_sort])
-            df1.to_excel(writer, sheet_name='Relacionado', startrow=1, header=False, index=False, na_rep='')
+        if(len(data1)>0):
+            try:
+                df1 = pd.DataFrame(data1)
+                df1.columns = header1
+                column_sort = header1[0]
+                df1 = df1.sort_values(by=[column_sort])
+                df1.to_excel(writer, sheet_name='Relacionado', startrow=1, header=False, index=False, na_rep='')
 
-            worksheet = writer.sheets['Relacionado']
-            worksheet.set_row(0, 80)
-            worksheet.set_column('A:XFD', None, style_default)
+                worksheet = writer.sheets['Relacionado']
+                worksheet.set_row(0, 80)
+                worksheet.set_column('A:XFD', None, style_default)
 
-            for col_num, value in enumerate(df1.columns.values):
-                if col_num < 7:
-                    worksheet.write(0, col_num, value, header_format_concorrente)
-                    column_len = df1[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
-                elif col_num == 7:
-                    worksheet.write(0, col_num, value, header_format_action)
-                    column_len = 35
-                else:
-                    worksheet.write(0, col_num, value, header_format_dominio)
-                    column_len = df1[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
+                for col_num, value in enumerate(df1.columns.values):
+                    if col_num < 7:
+                        worksheet.write(0, col_num, value, header_format_concorrente)
+                        column_len = df1[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
+                    elif col_num == 7:
+                        worksheet.write(0, col_num, value, header_format_action)
+                        column_len = 35
+                    else:
+                        worksheet.write(0, col_num, value, header_format_dominio)
+                        column_len = df1[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
 
-                worksheet.set_column(col_num, col_num, column_len)
+                    worksheet.set_column(col_num, col_num, column_len)
 
-        except:
-            print(f'Erro na aba "Relacionado": {str(e)}')
-            pass
+            except Exception as e:
+                print(f'Erro na aba "Relacionado": {str(e)}')
+                pass
         
-        try:
-            df2 = pd.DataFrame(data2)
-            df2.columns = header2
-            column_sort = header2[0]
-            df2 = df2.sort_values(by=[column_sort])
-            df2.to_excel(writer, sheet_name='+ de 1 result.', index=False, na_rep='')
+        if(len(data2)>0):
+            try:
+                df2 = pd.DataFrame(data2)
+                df2.columns = header2
+                column_sort = header2[0]
+                df2 = df2.sort_values(by=[column_sort])
+                df2.to_excel(writer, sheet_name='+ de 1 result.', index=False, na_rep='')
 
-            worksheet = writer.sheets['+ de 1 result.']
-            worksheet.set_row(0, 50)
-            worksheet.set_column('A:XFD', None, style_default)
+                worksheet = writer.sheets['+ de 1 result.']
+                worksheet.set_row(0, 50)
+                worksheet.set_column('A:XFD', None, style_default)
 
-            for col_num, value in enumerate(df2.columns.values):
-                if col_num < 6:
-                    worksheet.write(0, col_num, value, header_format_concorrente)
-                    column_len = df2[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
-                elif col_num == 6:
-                    worksheet.write(0, col_num, value, header_format_action)
-                    column_len = 35
-                else:
-                    worksheet.write(0, col_num, value, header_format_dominio)
-                    column_len = df2[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
+                for col_num, value in enumerate(df2.columns.values):
+                    if col_num < 6:
+                        worksheet.write(0, col_num, value, header_format_concorrente)
+                        column_len = df2[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
+                    elif col_num == 6:
+                        worksheet.write(0, col_num, value, header_format_action)
+                        column_len = 35
+                    else:
+                        worksheet.write(0, col_num, value, header_format_dominio)
+                        column_len = df2[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
 
-                worksheet.set_column(col_num, col_num, column_len)
-        except:
-            print(f'Erro na aba "+ de 1 result.": {str(e)}')
-            pass
+                    worksheet.set_column(col_num, col_num, column_len)
+            except Exception as e:
+                print(f'Erro na aba "+ de 1 result.": {str(e)}')
+                pass
         
-        try:
-            df3 = pd.DataFrame(data3)
-            df3.columns = header3
-            column_sort = header3[0]
-            df3 = df3.sort_values(by=[column_sort])
-            df3.to_excel(writer, sheet_name='Sem result.', index=False, na_rep='')
+        if(len(data3)>0):
+            try:
+                df3 = pd.DataFrame(data3)
+                df3.columns = header3
+                column_sort = header3[0]
+                df3 = df3.sort_values(by=[column_sort])
+                df3.to_excel(writer, sheet_name='Sem result.', index=False, na_rep='')
 
-            worksheet = writer.sheets['Sem result.']
-            worksheet.set_row(0, 50)
-            worksheet.set_column('A:XFD', None, style_default)
+                worksheet = writer.sheets['Sem result.']
+                worksheet.set_row(0, 50)
+                worksheet.set_column('A:XFD', None, style_default)
 
-            for col_num, value in enumerate(df3.columns.values):
-                if col_num < 6:
-                    worksheet.write(0, col_num, value, header_format_concorrente)
-                    column_len = df3[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
-                elif col_num == 6:
-                    worksheet.write(0, col_num, value, header_format_action)
-                    column_len = 35
-                else:
-                    worksheet.write(0, col_num, value, header_format_dominio)
-                    column_len = df3[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
+                for col_num, value in enumerate(df3.columns.values):
+                    if col_num < 6:
+                        worksheet.write(0, col_num, value, header_format_concorrente)
+                        column_len = df3[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
+                    elif col_num == 6:
+                        worksheet.write(0, col_num, value, header_format_action)
+                        column_len = 35
+                    else:
+                        worksheet.write(0, col_num, value, header_format_dominio)
+                        column_len = df3[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
 
-                worksheet.set_column(col_num, col_num, column_len)
-        except:
-            print(f'Erro na aba "Sem result.": {str(e)}')
-            pass
+                    worksheet.set_column(col_num, col_num, column_len)
+            except Exception as e:
+                print(f'Erro na aba "Sem result.": {str(e)}')
+                pass
 
-        try:
-            df4 = pd.DataFrame(data4)
-            df4.columns = header4
-            column_sort = header4[6]
-            df4 = df4.sort_values(by=[column_sort])
-            df4.to_excel(writer, sheet_name='Alerta', index=False, na_rep='')
+        if(len(data4)>0):
+            try:
+                df4 = pd.DataFrame(data4)
+                df4.columns = header4
+                column_sort = header4[6]
+                df4 = df4.sort_values(by=[column_sort])
+                df4.to_excel(writer, sheet_name='Alerta', index=False, na_rep='')
 
-            worksheet = writer.sheets['Alerta']
-            worksheet.set_row(0, 110)
-            worksheet.set_column('A:XFD', None, style_default)
+                worksheet = writer.sheets['Alerta']
+                worksheet.set_row(0, 110)
+                worksheet.set_column('A:XFD', None, style_default)
 
-            for col_num, value in enumerate(df4.columns.values):
-                if col_num < 7:
-                    worksheet.write(0, col_num, value, header_format_concorrente)
-                    column_len = df4[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
-                elif col_num == 7:
-                    worksheet.write(0, col_num, value, header_format_action)
-                    column_len = 45
-                else:
-                    worksheet.write(0, col_num, value, header_format_dominio)
-                    column_len = df4[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
+                for col_num, value in enumerate(df4.columns.values):
+                    if col_num < 7:
+                        worksheet.write(0, col_num, value, header_format_concorrente)
+                        column_len = df4[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
+                    elif col_num == 7:
+                        worksheet.write(0, col_num, value, header_format_action)
+                        column_len = 45
+                    else:
+                        worksheet.write(0, col_num, value, header_format_dominio)
+                        column_len = df4[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
 
-                worksheet.set_column(col_num, col_num, column_len)
-        except Exception as e:
-            print(f'Erro na aba "Alertas": {str(e)}')
-            pass
+                    worksheet.set_column(col_num, col_num, column_len)
+            except Exception as e:
+                print(f'Erro na aba "Alertas": {str(e)}')
+                pass
 
-        writer.save()
+        writer.close()
 
     def gerar_arquivos_saida(self):
         tabela_FOEVENTOS = []
