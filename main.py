@@ -6,10 +6,12 @@ esocial = eSocialXML("xml")
 esocial.carregar_informacoes_xml()
 
 relacao_empresas = esocial.relaciona_empresas()
+relacao_empregados = esocial.relaciona_empregados()
+
 esocial.gera_excel_relacao(relacao_empresas)
 
-esocial.gerar_afastamentos_importacao()
-esocial.gerar_ferias_importacao()
+esocial.gerar_afastamentos_importacao(relacao_empresas, relacao_empregados)
+esocial.gerar_ferias_importacao(relacao_empresas, relacao_empregados)
 
 '''f = open("s1010.json","w")
 f.write(json.dumps(esocial.processar_rubricas()))
