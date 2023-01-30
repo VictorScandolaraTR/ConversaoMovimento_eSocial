@@ -7,7 +7,7 @@ esocial = eSocialXML("xml")
 esocial.carregar_informacoes_xml()
 
 relacao_empresas = esocial.relaciona_empresas()
-esocial.gera_excel_relacao()
+esocial.gera_excel_relacao(relacao_empresas)
 
 '''f = open("s1010.json","w")
 f.write(json.dumps(esocial.processar_rubricas()))

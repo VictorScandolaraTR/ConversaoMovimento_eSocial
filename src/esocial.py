@@ -241,6 +241,7 @@ class eSocialXML():
     def relaciona_empresas(self):
         '''Gera listagem de empresas que tem rubricas sendo tratadas'''
         dicionario_empresas = {}
+        inscricoes_originais = {}
         cgcs_rubricas = []
 
         engine = create_engine("sybase+pyodbc://{user}:{pw}@{dsn}".format(user=self.usuario_dominio, pw=self.senha_dominio, dsn=self.base_dominio))
@@ -252,17 +253,24 @@ class eSocialXML():
             inscricao = self.dicionario_s1010.get(rubrica).get("ideEmpregador").get("nrInsc")
 
             if(self.dicionario_s1010.get(rubrica).get("ideEmpregador").get("tpInsc")=="1"):
+                inscricoes_originais[self.completar_cnpj(inscricao)] = inscricao
                 inscricao = self.completar_cnpj(inscricao)
+            else:
+                inscricoes_originais[inscricao] = inscricao
 
             if inscricao not in cgcs_rubricas:
                 cgcs_rubricas.append(inscricao)
 
         for i in range(len(df_empresas)):
             if(df_empresas.loc[i,"cgce_emp"] in cgcs_rubricas):
-                dicionario_empresas[inscricao] = {
+                inscricao = df_empresas.loc[i,"cgce_emp"]
+                inscricao_original = inscricoes_originais[inscricao]
+
+                dicionario_empresas[inscricao_original] = {
                     "codigo":df_empresas.loc[i,"codi_emp"],
                     "nome":df_empresas.loc[i,"nome_emp"],
-                    "cgc":df_empresas.loc[i,"cgce_emp"]
+                    "cgc":inscricao,
+                    "processar": "S"
                 }
 
         return dicionario_empresas
@@ -376,7 +384,7 @@ class eSocialXML():
 
             self.dicionario_rubricas_dominio[i_eventos] = rubrica
     
-    def gera_excel_relacao(self):
+    def gera_excel_relacao(self, empresas):
         '''Gera o excel com as rubricas para relacionar com as rubricas padrão do Domínio'''
 
         linhas_excel_alerta = set()
@@ -390,91 +398,95 @@ class eSocialXML():
         
         print("Relacionando rubricas")
         for s1010 in tqdm(self.dicionario_s1010):
-            codigo = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('ideRubrica').get('codRubr')
+            inscricao = self.dicionario_s1010.get(s1010).get('ideEmpregador').get('nrInsc')
+            processa_empresa = empresas.get(inscricao).get("processar")
 
-            if (codigo not in lista_rubricas):
-                lista_rubricas.append(codigo)
+            if(processa_empresa=="S"):
+                codigo = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('ideRubrica').get('codRubr')
 
-                info_rubrica = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('dadosRubrica')
+                if (codigo not in lista_rubricas):
+                    lista_rubricas.append(codigo)
 
-                match int(info_rubrica.get('tpRubr')):
-                    case 1: tipo = "P"
-                    case 2: tipo = "D"
-                    case 3: tipo = "I"
-                    case 4: tipo = "ID"
-                
-                nome = info_rubrica.get('dscRubr')
-                rubesocial = info_rubrica.get('natRubr')
-                tpbaseinss = info_rubrica.get('codIncCP')
-                tpbaseirrf = info_rubrica.get('codIncIRRF')
-                tpbasefgts = info_rubrica.get('codIncFGTS')
-                tpbasesindical = info_rubrica.get('codIncSIND')
+                    info_rubrica = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('dadosRubrica')
 
-                lista_relacoes = self.relaciona_rubricas(self.dicionario_s1010.get(s1010))
-
-                if(len(lista_relacoes)==0):
-                    linhas_excel_nao_relacionado.add((
-                        codigo,
-                        nome,
-                        tipo,
-                        rubesocial,
-                        tpbaseinss,
-                        tpbaseirrf,
-                        tpbasefgts,
-                        tpbasesindical,
-                        "N"
-                    ))
-                elif(len(lista_relacoes)==1):
-                    linhas_excel_relacionado.add((
-                        codigo,
-                        nome,
-                        tipo,
-                        rubesocial,
-                        tpbaseinss,
-                        tpbaseirrf,
-                        tpbasefgts,
-                        tpbasesindical,
-                        lista_relacoes[0],
-                        "X"
-                    ))
-
-                    if(relacao_dominio_esocial.get(lista_relacoes[0])==None): relacao_dominio_esocial[lista_relacoes[0]] = []
-                    relacao_dominio_esocial[lista_relacoes[0]].append(s1010)
+                    match int(info_rubrica.get('tpRubr')):
+                        case 1: tipo = "P"
+                        case 2: tipo = "D"
+                        case 3: tipo = "I"
+                        case 4: tipo = "ID"
                     
-                elif(len(lista_relacoes)>1):
-                    print("Multi-relações")
-                    linha = [
-                        codigo,
-                        nome,
-                        tipo,
-                        rubesocial,
-                        tpbaseinss,
-                        tpbaseirrf,
-                        tpbasefgts,
-                        tpbasesindical,
-                        ""
-                    ]
+                    nome = info_rubrica.get('dscRubr')
+                    rubesocial = info_rubrica.get('natRubr')
+                    tpbaseinss = info_rubrica.get('codIncCP')
+                    tpbaseirrf = info_rubrica.get('codIncIRRF')
+                    tpbasefgts = info_rubrica.get('codIncFGTS')
+                    tpbasesindical = info_rubrica.get('codIncSIND')
 
-                    relacionamento_atual = 0
-                    
-                    while relacionamento_atual < 10:
-                        if(relacionamento_atual < len(lista_relacoes)):
-                            if(self.dicionario_rubricas_esocial.get(int(lista_relacoes[relacionamento_atual]))!=None):
-                                linha.append(lista_relacoes[relacionamento_atual])
-                                linha.append(self.dicionario_s1010.get(lista_relacoes[relacionamento_atual]).get("nome"))
+                    lista_relacoes = self.relaciona_rubricas(self.dicionario_s1010.get(s1010))
 
-                                if(relacao_dominio_esocial.get(lista_relacoes[0])==None):
-                                    relacao_dominio_esocial[lista_relacoes[0]] = []
-                                
-                                if(s1010 not in relacao_dominio_esocial[lista_relacoes[0]]): 
-                                    relacao_dominio_esocial[lista_relacoes[0]].append(s1010)
-                        else:
-                            linha.append("")
-                            linha.append("")
+                    if(len(lista_relacoes)==0):
+                        linhas_excel_nao_relacionado.add((
+                            codigo,
+                            nome,
+                            tipo,
+                            rubesocial,
+                            tpbaseinss,
+                            tpbaseirrf,
+                            tpbasefgts,
+                            tpbasesindical,
+                            "N"
+                        ))
+                    elif(len(lista_relacoes)==1):
+                        linhas_excel_relacionado.add((
+                            codigo,
+                            nome,
+                            tipo,
+                            rubesocial,
+                            tpbaseinss,
+                            tpbaseirrf,
+                            tpbasefgts,
+                            tpbasesindical,
+                            lista_relacoes[0],
+                            "X"
+                        ))
 
-                        relacionamento_atual = relacionamento_atual + 1
-                    
-                    linhas_excel_multirelacionado.add(tuple(linha))
+                        if(relacao_dominio_esocial.get(lista_relacoes[0])==None): relacao_dominio_esocial[lista_relacoes[0]] = []
+                        relacao_dominio_esocial[lista_relacoes[0]].append(s1010)
+                        
+                    elif(len(lista_relacoes)>1):
+                        print("Multi-relações")
+                        linha = [
+                            codigo,
+                            nome,
+                            tipo,
+                            rubesocial,
+                            tpbaseinss,
+                            tpbaseirrf,
+                            tpbasefgts,
+                            tpbasesindical,
+                            ""
+                        ]
+
+                        relacionamento_atual = 0
+                        
+                        while relacionamento_atual < 10:
+                            if(relacionamento_atual < len(lista_relacoes)):
+                                if(self.dicionario_rubricas_esocial.get(int(lista_relacoes[relacionamento_atual]))!=None):
+                                    linha.append(lista_relacoes[relacionamento_atual])
+                                    linha.append(self.dicionario_s1010.get(lista_relacoes[relacionamento_atual]).get("nome"))
+
+                                    if(relacao_dominio_esocial.get(lista_relacoes[0])==None):
+                                        relacao_dominio_esocial[lista_relacoes[0]] = []
+                                    
+                                    if(s1010 not in relacao_dominio_esocial[lista_relacoes[0]]): 
+                                        relacao_dominio_esocial[lista_relacoes[0]].append(s1010)
+                            else:
+                                linha.append("")
+                                linha.append("")
+
+                            relacionamento_atual = relacionamento_atual + 1
+                        
+                        linhas_excel_multirelacionado.add(tuple(linha))
                     
         print("Imprimindo planilha")
         for relacao in relacao_dominio_esocial:
