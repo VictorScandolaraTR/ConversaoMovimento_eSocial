@@ -3,6 +3,9 @@ import re
 import tempfile
 import shutil
 import chardet
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+import json
 
 def print_to_import(output_file, data):
     """
@@ -102,3 +105,150 @@ def remove_caracter_out_of_cp1252(string):
         except:
             pass
     return retorno
+
+
+def format_date(date, date_format):
+    try:
+        return datetime.strptime(date, date_format)
+    except:
+        return None
+
+
+def transform_date(date, old_format, new_format, default_value_error=None):
+    """
+    Mudar formato de uma data
+    """
+    try:
+        return datetime.strftime(format_date(date, old_format), new_format)
+    except:
+        return default_value_error
+
+
+def convert_date(str_date, date_format, default_value_error='NULO'):
+    """
+    Converter uma String para data
+    """
+    try:
+        if isinstance(str_date, str):
+            return datetime.strptime(str_date, date_format).date()
+        else:
+            return str_date.date()
+    except:
+        return default_value_error
+
+
+def is_null(field, check_int=False, date=False):
+    """
+    Verifica se o valor presente no campo é válido ou não
+    """
+    result = False
+    if type(field) == str:
+        if str(field).strip().upper() == '':
+            result = True
+        elif str(field).strip().upper() == 'NULO':
+            result = True
+        elif str(field).strip().upper() == 'NULL':
+            result = True
+
+    if field == None:
+        result = True
+
+    if field == False:
+        result = True
+
+    if check_int:
+        try:
+            if int(field) == 0:
+                return True
+        except:
+            return True
+
+    if date:
+        if field == '01/01/1900':
+            return True
+
+    return result
+
+
+def add_day_to_date(str_date, date_format, days, default_value_error='NULO'):
+    """
+    Adiciona dias(int) a uma string de data e retorna uma string no formato DD/MM/YYYY
+    """
+    try:
+        new_date = default_value_error
+        if not is_null(str_date):
+            date = convert_date(str_date, date_format)
+            new_date = (date + timedelta(days=days)).strftime("%d/%m/%Y")
+
+        return new_date
+    except:
+        return default_value_error
+
+
+def get_keys(key):
+    """
+    Retorna valores do arquivo depara.json
+    """
+    with open('.\\src\\database\\depara.json') as file:
+        dicionario = json.load(file)
+
+    if str(key).upper() in dicionario.keys():
+        return dicionario[str(key).upper()]
+    elif str(key).lower() in dicionario.keys():
+        return dicionario[str(key).lower()]
+    elif str(key).capitalize() in dicionario.keys():
+        return dicionario[str(key).capitalize()]
+    else:
+        return False
+
+
+def get_current_day():
+    """
+    Retorna a data atual
+    """
+    return datetime.today()
+
+
+def difference_between_dates(str_start_date, str_end_date, date_format):
+    """
+    Retorna a diferença em dias entre duas datas
+    """
+    result = False
+    if not is_null(str_start_date) and not is_null(str_end_date):
+        start_date = convert_date(str_start_date, date_format)
+        end_date = convert_date(str_end_date, date_format)
+        if end_date < start_date:
+            result = 0
+        else:
+            result = abs((start_date - end_date).days)
+
+    return result
+
+
+def add_year_to_date(str_date, years, date_format, default_value_error='NULO'):
+    """
+    Adiciona anos(int) a uma string de data no formato DD/MM/YYYY
+    Retorna uma string no formato DD/MM/YYYY
+    """
+    try:
+        date = convert_date(str_date, date_format)
+        return (date + relativedelta(years=int(years))).strftime("%d/%m/%Y")
+    except:
+        return default_value_error
+
+
+def get_competence(str_date):
+    """
+    Recebe uma data no formato YYYY-MM-DD e retorna a competência
+    no formato YYYY-MM
+    """
+    competence = str_date[:7]
+    return competence
+
+
+def get_year(str_date):
+    """
+    Recebe uma data no formato YYYY-MM-DD e retorna o ano que está informado
+    """
+    year = str_date[:4]
+    return year

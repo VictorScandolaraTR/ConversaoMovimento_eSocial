@@ -1,9 +1,14 @@
 import os, shutil, json, xmltodict, Levenshtein
 from tqdm import tqdm
-from classes.Table import Table
+from pyodbc import connect
 from sqlalchemy import create_engine
 import xml.dom.minidom as xml
 import pandas as pd
+
+from src.classes.Table import Table
+from src.classes.StorageData import StorageData
+from src.classes.Sequencial import Sequencial
+from src.utils.functions import *
 
 class eSocialXML():
     def __init__(self, diretorio_xml):
@@ -11,6 +16,7 @@ class eSocialXML():
         self.DIRETORIO_XML = f"{diretorio_xml}\\eventos"
         self.DIRETORIO_DOWNLOADS = f"{diretorio_xml}\\downloads"
         self.DIRETORIO_SAIDA = f"{diretorio_xml}\\saida"
+        self.DIRETORIO_IMPORTAR = f"{diretorio_xml}\\importar"
 
         self.dicionario_rubricas_dominio = {} # Rubricas Domínio
         self.dicionario_s1010 = {} # Rubricas
@@ -731,3 +737,311 @@ class eSocialXML():
             table.set_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL', fgts)
             table.set_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL', sindicato)
             tabela_FOEVENTOS.append(table.do_output())
+
+    def gerar_afastamentos_importacao(self):
+        """
+        Gera o arquivo FOAFASTAMENTOS_IMPORTACAO
+        """
+        data_foafastamentos_importacao = []
+        data_afastamentos_xml_incompleto = StorageData()
+        data_afastamentos_xml = StorageData()
+
+        # Podem vir afastamentos onde a data de início está em um XML e a
+        # data fim em outro, dessa forma precisamos organizar os dados e encontrar
+        # os respectivos inicio e fim
+        for s2230 in self.dicionario_s2230:
+            cnpj_empregador = self.dicionario_s2230[s2230].get('ideEmpregador').get('nrInsc')
+            cpf_empregado = self.dicionario_s2230[s2230].get('ideVinculo').get('cpfTrab')
+
+            data_inicio = ''
+            data_fim = ''
+
+            infos_afastamento = self.dicionario_s2230[s2230].get('infoAfastamento')
+            if infos_afastamento.get('iniAfastamento') is not None:
+                if infos_afastamento.get('iniAfastamento').get('dtIniAfast') is not None:
+                    data_inicio = infos_afastamento.get('iniAfastamento').get('dtIniAfast')
+
+            if infos_afastamento.get('fimAfastamento') is not None:
+                if infos_afastamento.get('fimAfastamento').get('dtTermAfast') is not None:
+                    data_fim = infos_afastamento.get('fimAfastamento').get('dtTermAfast')
+
+            if not is_null(data_inicio) and not is_null(data_fim):
+                data_afastamentos_xml.add(infos_afastamento, [cnpj_empregador, cpf_empregado, data_inicio])
+            if is_null(data_fim):
+                # print(cpf_empregado, data_inicio, infos_afastamento)
+                data_afastamentos_xml_incompleto.add(infos_afastamento, [cnpj_empregador, cpf_empregado, 'INICIO', data_inicio])
+            if is_null(data_inicio):
+                data_afastamentos_xml_incompleto.add(infos_afastamento, [cnpj_empregador, cpf_empregado, 'FIM', data_fim])
+
+        # Para cada afastamento sem data fim, pega o primeiro fim que for posterior ao início
+        for cnpj_empregador in data_afastamentos_xml_incompleto.get_all_dict():
+            for cpf_empregado in data_afastamentos_xml_incompleto.get([cnpj_empregador]):
+
+                # ordendar datas de início
+                datas_inicio_ordenadas = []
+                for data_inicio in data_afastamentos_xml_incompleto.get([cnpj_empregador, cpf_empregado, 'INICIO']):
+                    datas_inicio_ordenadas.append(convert_date(data_inicio, '%Y-%m-%d'))
+                datas_inicio_ordenadas.sort()
+
+                # ordenar datas fim
+                datas_fim_ordenadas = []
+                for data_fim in data_afastamentos_xml_incompleto.get([cnpj_empregador, cpf_empregado, 'FIM']):
+                    datas_fim_ordenadas.append(convert_date(data_fim, '%Y-%m-%d'))
+
+                datas_fim_ordenadas.sort()
+
+                # Tenta encontrar a data fim para o afastamento
+                for data_inicio_formatada in datas_inicio_ordenadas:
+                    data_inicio_string = data_inicio_formatada.strftime('%Y-%m-%d')
+                    infos_afastamento = data_afastamentos_xml_incompleto.get([cnpj_empregador, cpf_empregado, 'INICIO', data_inicio_string])
+
+                    end_date_found = False
+                    for data_fim_formatada in datas_fim_ordenadas:
+                        data_fim_string = data_fim_formatada.strftime('%Y-%m-%d')
+                        if data_inicio_formatada < data_fim_formatada:
+                            infos_fim = data_afastamentos_xml_incompleto.get([cnpj_empregador, cpf_empregado, 'FIM', data_fim_string])
+
+                            if not is_null(infos_fim):
+                                infos_afastamento.update(infos_fim)
+                                data_afastamentos_xml.add(infos_afastamento, [cnpj_empregador, cpf_empregado, data_inicio_string])
+                                data_afastamentos_xml_incompleto.overwrite('', [cnpj_empregador, cpf_empregado, 'FIM', data_fim_string])
+                                end_date_found = True
+                                break
+
+                    if not end_date_found:
+                        data_afastamentos_xml.add(infos_afastamento, [cnpj_empregador, cpf_empregado, data_inicio_string])
+
+        # afastamentos temporários
+        for cnpj_empregador in data_afastamentos_xml.get_all_dict():
+            for cpf_empregado in data_afastamentos_xml.get([cnpj_empregador]):
+                for data_inicio in data_afastamentos_xml.get([cnpj_empregador, cpf_empregado]):
+                    infos_afastamento = data_afastamentos_xml.get([cnpj_empregador, cpf_empregado, data_inicio])
+                    codi_emp = '1'
+                    i_empregados = '1'
+
+                    data_fim = ''
+                    if infos_afastamento.get('fimAfastamento') is not None:
+                        data_fim = infos_afastamento.get('fimAfastamento').get('dtTermAfast')
+
+                    cod_motivo_esocial = infos_afastamento.get('iniAfastamento').get('codMotAfast')
+                    motivos_esocial = get_keys('motivos_afastamentos_esocial')
+
+                    if cod_motivo_esocial in motivos_esocial:
+                        motivo = motivos_esocial.get(cod_motivo_esocial)
+                    else:
+                        continue
+
+                    # afastamento por doença ou acidente de trabalho tem o mesmo código no eSocial
+                    # e no Domínio depende da quantidade de dias
+                    if motivo in ['03', '06']:
+                        if is_null(data_fim):
+                            data_fim = get_current_day()
+
+                    if difference_between_dates(data_inicio, data_fim, '%Y-%m-%d') <= 15:
+                        if motivo == '03':
+                            motivo = '17'
+                        elif motivo == '06':
+                            motivo = '18'
+
+                    table = Table('FOAFASTAMENTOS_IMPORTACAO')
+
+                    table.set_value('CODI_EMP', codi_emp)
+                    table.set_value('I_EMPREGADOS', i_empregados)
+                    table.set_value('I_AFASTAMENTOS', motivo)
+                    table.set_value('DATA_REAL', transform_date(data_inicio, '%Y-%m-%d', '%d/%m/%Y'))
+                    table.set_value('DATA_FIM', transform_date(data_fim, '%Y-%m-%d', '%d/%m/%Y', default_value_error='NULO'))
+                    data_foafastamentos_importacao.append(table.do_output())
+
+        # demissões empregados
+        for s2299 in self.dicionario_s2299:
+            codi_emp = '1'
+            i_empregados = '1'
+
+            data_desligamento = self.dicionario_s2299[s2299].get("infoDeslig").get("dtDeslig")
+            data_real_demissao = add_day_to_date(data_desligamento, '%Y-%m-%d', 1)
+            table = Table('FOAFASTAMENTOS_IMPORTACAO')
+
+            table.set_value('CODI_EMP', codi_emp)
+            table.set_value('I_EMPREGADOS', i_empregados)
+            table.set_value('I_AFASTAMENTOS', 8)
+            table.set_value('DATA_REAL', data_real_demissao)
+            data_foafastamentos_importacao.append(table.do_output())
+
+        # demissões contribuintes
+        for s2399 in self.dicionario_s2399:
+            codi_emp = '1'
+            i_empregados = '1'
+
+            data_demissao = self.dicionario_s2399[s2399].get("infoTSVTermino").get("dtTerm")
+            table = Table('FOAFASTAMENTOS_IMPORTACAO')
+
+            table.set_value('CODI_EMP', codi_emp)
+            table.set_value('I_EMPREGADOS', i_empregados)
+            table.set_value('I_AFASTAMENTOS', 8)
+            table.set_value('DATA_REAL', transform_date(data_demissao, '%Y-%m-%d', '%d/%m/%Y'))
+            data_foafastamentos_importacao.append(table.do_output())
+
+        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOAFASTAMENTOS_IMPORTACAO.txt', data_foafastamentos_importacao)
+
+    def gerar_ferias_importacao(self):
+        """
+        Gera os arquivos FOFERIAS_AQUISITIVOS e FOFERIAS_GOZO
+        """
+        data_foferias_aquisitivos = []
+        data_foferias_gozo = []
+
+        sequencial_aquisitivos = Sequencial()
+        sequencial_gozos = Sequencial()
+        check_aquisitivos = StorageData()
+        payment_data = StorageData()
+
+        # guarda os dados de férias que vem no evento de pagamento
+        for s1210 in self.dicionario_s1210:
+            insc_empresa = self.dicionario_s1210[s1210].get('ideEmpregador').get('nrInsc')
+            cpf_empregado = self.dicionario_s1210[s1210].get('ideBenef').get('cpfBenef')
+
+            competence = self.dicionario_s1210[s1210].get('ideEvento').get('perApur')
+            infos_pagto = self.dicionario_s1210[s1210].get('ideBenef').get('infoPgto')
+
+            # as vezes as informações de pagamento vem em um unico objeto, e
+            # outras vem em uma lista de objetos
+            if isinstance(infos_pagto, dict):
+                data_pagto = infos_pagto.get('dtPgto')
+            elif isinstance(infos_pagto, list):
+                data_pagto = ''
+
+                # percorre a lista de infos sobre o pagamento e coleta a data
+                # de pagamento daquela que for referente a mesma competência
+                for item in infos_pagto:
+                    if item.get('detPgtoFl') is not None:
+                        ref_competence = item.get('detPgtoFl').get('perRef')
+                    else:
+                        ref_competence = item.get('perRef')
+
+                    if competence == ref_competence:
+                        data_pagto = item.get('dtPgto')
+
+                # as vezes em vez da competência vem somente o ano do pagamento
+                # dessa forma coletamos também quando o ano for igual ao da competência
+                if is_null(data_pagto):
+                    for item in infos_pagto:
+                        if item.get('detPgtoFl') is not None:
+                            ref_competence = item.get('detPgtoFl').get('perRef')
+                        else:
+                            ref_competence = item.get('perRef')
+
+                        if not is_null(ref_competence) and len(ref_competence) == 4:
+                            if get_year(competence) == get_year(ref_competence):
+                                data_pagto = item.get('dtPgto')
+                        elif competence == ref_competence:
+                            data_pagto = item.get('dtPgto')
+            else:
+                data_pagto = ''
+
+            payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
+
+        for s2230 in self.dicionario_s2230:
+            insc_empresa = self.dicionario_s2230[s2230].get('ideEmpregador').get('nrInsc')
+            cpf_empregado = self.dicionario_s2230[s2230].get('ideVinculo').get('cpfTrab')
+
+            infos_afastamento = self.dicionario_s2230[s2230].get("infoAfastamento")
+            motivo = infos_afastamento.get('iniAfastamento').get("codMotAfast")
+
+            # Afastamentos de férias é código 15 no eSocial
+            if motivo != '15': continue
+
+            codi_emp = '1'
+            i_empregados = '1'
+
+            data_inicio_aquisitivo = ''
+            data_fim_aquisitivo = ''
+            if infos_afastamento.get('iniAfastamento').get('perAquis') is not None:
+                data_inicio_aquisitivo = infos_afastamento.get('iniAfastamento').get('perAquis').get('dtInicio')
+                data_fim_aquisitivo = infos_afastamento.get('iniAfastamento').get('perAquis').get('dtFim')
+
+            # ignora se não houver inicio e fim do aquisitivo
+            if is_null(data_inicio_aquisitivo) or is_null(data_fim_aquisitivo): continue
+
+            limite_para_gozo = add_year_to_date(data_inicio_aquisitivo, 2, '%Y-%m-%d')
+
+            if not check_aquisitivos.exist([codi_emp, i_empregados, data_inicio_aquisitivo]):
+                i_ferias_aquisitivos = sequencial_aquisitivos.add([codi_emp, i_empregados])
+
+                table = Table('FOFERIAS_AQUISITIVOS')
+                table.set_value('CODI_EMP', codi_emp)
+                table.set_value('I_EMPREGADOS', i_empregados)
+                table.set_value('I_FERIAS_AQUISITIVOS', i_ferias_aquisitivos)
+                table.set_value('DATA_INICIO', transform_date(data_inicio_aquisitivo, '%Y-%m-%d', '%d/%m/%Y'))
+                table.set_value('DATA_FIM', transform_date(data_fim_aquisitivo, '%Y-%m-%d', '%d/%m/%Y'))
+                table.set_value('SITUACAO', 1)
+                table.set_value('AFAST_PREVIDENCIA', 0)
+                table.set_value('AFAST_SEM_REMUNERACAO', 0)
+                table.set_value('AFAST_COM_REMUNERACAO', 0)
+                table.set_value('DIAS_FALTAS', 0)
+                table.set_value('DIAS_DIREITO', 30)
+                table.set_value('DIAS_GOZADOS', 0)
+                table.set_value('DIAS_ABONO', 0)
+                table.set_value('AVOS_ADQUIRIDOS', 12)
+                table.set_value('LIMITE_PARA_GOZO', limite_para_gozo)
+
+                data_foferias_aquisitivos.append(table.do_output())
+                check_aquisitivos.add(i_ferias_aquisitivos, [codi_emp, i_empregados, data_inicio_aquisitivo])
+
+            data_inicio_gozo = ''
+            data_fim_gozo = ''
+            if infos_afastamento.get('iniAfastamento') is not None:
+                data_inicio_gozo = infos_afastamento.get('iniAfastamento').get('dtIniAfast')
+
+            if infos_afastamento.get('fimAfastamento') is not None:
+                data_fim_gozo = infos_afastamento.get('fimAfastamento').get('dtTermAfast')
+
+            # ignora se não houver inicio e fim do aquisitivo
+            if is_null(data_inicio_gozo) or is_null(data_fim_gozo): continue
+
+            competencia = get_competence(data_inicio_gozo)
+            i_ferias_gozo = sequencial_gozos.add([codi_emp, i_empregados])
+            i_ferias_aquisitivos = check_aquisitivos.get([codi_emp, i_empregados, data_inicio_aquisitivo])
+
+            # Falta encontrar no XML as datas de abono
+            abono_inicio = ''
+            abono_fim = ''
+            data_pagamento = payment_data.get([insc_empresa, cpf_empregado, competencia])
+
+            abono_paga = 'N'
+            if not is_null(abono_inicio) and not is_null(abono_fim):
+                abono_paga = 'S'
+
+            # campos decimais
+            gozo_inicio_dn = f"{difference_between_dates('1900-01-01', data_inicio_gozo, '%Y-%m-%d')}.00"
+            gozo_fim_dn = f"{difference_between_dates('1900-01-01', data_fim_gozo, '%Y-%m-%d')}.99"
+
+            abono_inicio_dn = '0.00'
+            abono_fim_dn = '0.00'
+            if abono_paga == 'S':
+                abono_inicio_dn = f"{difference_between_dates('1900-01-01', abono_inicio, '%Y-%m-%d')}.00"
+                abono_fim_dn = difference_between_dates(abono_fim, '1900-01-01', '%Y-%m-%d')
+
+            table = Table('FOFERIAS_GOZO')
+            table.set_value('CODI_EMP', codi_emp)
+            table.set_value('I_EMPREGADOS', i_empregados)
+            table.set_value('I_FERIAS_GOZO', i_ferias_gozo)
+            table.set_value('I_FERIAS_AQUISITIVOS', i_ferias_aquisitivos)
+            table.set_value('GOZO_INICIO', transform_date(data_inicio_gozo, '%Y-%m-%d', '%d/%m/%Y'))
+            table.set_value('GOZO_FIM', transform_date(data_fim_gozo, '%Y-%m-%d', '%d/%m/%Y'))
+            table.set_value('ABONO_PAGA', abono_paga)
+            table.set_value('ABONO_INICIO', abono_inicio)
+            table.set_value('ABONO_FIM', abono_fim)
+            table.set_value('DATA_PAGTO', transform_date(data_pagamento, '%Y-%m-%d', '%d/%m/%Y'))
+            table.set_value('PAGA_AD13', '')
+            table.set_value('TIPO', '1')
+            table.set_value('GOZO_INICIO_DN', gozo_inicio_dn)
+            table.set_value('GOZO_FIM_DN', gozo_fim_dn)
+            table.set_value('ABONO_INICIO_DN', abono_inicio_dn)
+            table.set_value('ABONO_FIM_DN', abono_fim_dn)
+            table.set_value('INICIO_AQUISITIVO', transform_date(data_inicio_aquisitivo, '%Y-%m-%d', '%d/%m/%Y'))
+            table.set_value('FIM_AQUISITIVO', transform_date(data_fim_aquisitivo, '%Y-%m-%d', '%d/%m/%Y'))
+
+            data_foferias_gozo.append(table.do_output())
+
+        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_AQUISITIVOS.txt', data_foferias_aquisitivos)
+        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_GOZO.txt', data_foferias_gozo)

@@ -1,5 +1,5 @@
 class StorageData:
-    
+
     def __init__(self):
         self.__data = {}
     
@@ -9,6 +9,13 @@ class StorageData:
             auxiliary_data = auxiliary_data.setdefault(key, {})
         auxiliary_data[keys[-1]] = auxiliary_data.get(keys[-1], value)
             
+
+    def overwrite(self, new_value, keys=[]):
+        auxiliary_data = self.__data
+        for key in keys[:-1]:
+            auxiliary_data = auxiliary_data.setdefault(key, {})
+        auxiliary_data[keys[-1]] = new_value
+
     
     def exist(self, keys=[]):
         auxiliary_data = self.__data
@@ -35,3 +42,12 @@ class StorageData:
                     value = auxiliary_data
 
         return value
+
+    def get_all_dict(self):
+        return self.__data
+
+    def is_empty(self):
+        if self.__data.keys():
+            return False
+        else:
+            return True
