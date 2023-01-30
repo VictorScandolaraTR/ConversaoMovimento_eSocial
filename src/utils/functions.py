@@ -186,6 +186,18 @@ def add_day_to_date(str_date, date_format, days, default_value_error='NULO'):
         return default_value_error
 
 
+def add_month_to_date(str_date, months, date_format, default_value_error='NULO'):
+    """
+    Adiciona meses(int) a uma string de data no formato DD/MM/YYYY
+    Retorna uma string no formato DD/MM/YYYY
+    """
+    try:
+        date = convert_date(str_date, date_format)
+        return (date + relativedelta(months=int(months))).strftime(date_format)
+    except:
+        return default_value_error
+
+
 def get_keys(key):
     """
     Retorna valores do arquivo depara.json

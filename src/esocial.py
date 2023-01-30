@@ -774,9 +774,17 @@ class eSocialXML():
             if is_null(codi_emp) or is_null(i_empregados):
                 continue
 
-            original_competence = self.dicionario_s1200[s1200].get('ideEvento').get('perApur')
-            competence = f"{self.dicionario_s1200[s1200].get('ideEvento').get('perApur')}-01"
             infos_pagto = self.dicionario_s1200[s1200].get('dmDev')
+
+            complete_competence = self.dicionario_s1200[s1200].get('ideEvento').get('perApur')
+            if len(complete_competence) == 4:
+                # preenche o mês 12 e dia como 01
+                complete_competence += '-12-01'
+            else:
+                # preenche o dia como 01
+                complete_competence += '-01'
+
+            competence = get_competence(complete_competence)
 
             itens_to_handle = []
             if isinstance(infos_pagto, list):
@@ -794,7 +802,6 @@ class eSocialXML():
                     events_to_handle.append(infos_events)
 
                 for line in events_to_handle:
-                    data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, original_competence])
                     i_eventos = line.get('codRubr')
                     valor_calculado = line.get('vrRubr')
 
@@ -802,11 +809,30 @@ class eSocialXML():
                     if line.get('fatorRubr') is not None:
                         valor_informado = line.get('fatorRubr')
 
+                    # se não encontrar a data de pagamento, vê o dia de pagamento da competência
+                    # anterior ou posterior
+                    data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, competence])
+                    if is_null(data_pagto):
+                        previus_competence = get_competence(add_month_to_date(complete_competence, -1, '%Y-%m-%d'))
+                        next_competence = get_competence(add_month_to_date(complete_competence, 1, '%Y-%m-%d'))
+
+                        if payment_data.exist([cnpj_empregador, cpf_empregado, previus_competence]):
+                            previus_data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, previus_competence])
+                            data_pagto = add_month_to_date(previus_data_pagto, 1, '%Y-%m-%d')
+
+                        if is_null(data_pagto):
+                            if payment_data.exist([cnpj_empregador, cpf_empregado, next_competence]):
+                                next_data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, next_competence])
+                                data_pagto = add_month_to_date(next_data_pagto, -1, '%Y-%m-%d')
+
+                    if is_null(data_pagto):
+                        continue
+
                     table = Table('FOLANCAMENTOS_EVENTOS')
                     table.set_value('CODI_EMP', codi_emp)
                     table.set_value('I_EMPREGADOS', i_empregados)
                     table.set_value('TIPO_PROCESSO', '1')
-                    table.set_value('COMPETENCIA_INICIAL', transform_date(competence, '%Y-%m-%d', '%d/%m/%Y'))
+                    table.set_value('COMPETENCIA_INICIAL', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
                     table.set_value('DATA_PAGAMENTO_ALTERA_CALCULO', transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y'))
                     table.set_value('I_EVENTOS', i_eventos)
                     table.set_value('VALOR_INFORMADO', valor_informado)
