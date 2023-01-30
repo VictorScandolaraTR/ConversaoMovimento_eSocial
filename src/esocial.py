@@ -1,6 +1,7 @@
 import os, shutil, json, xmltodict, Levenshtein
 from tqdm import tqdm
 from pyodbc import connect
+from sqlalchemy import create_engine
 import xml.dom.minidom as xml
 import pandas as pd
 
@@ -11,16 +12,13 @@ from src.utils.functions import *
 
 class eSocialXML():
     def __init__(self, diretorio_xml):
+        self.DIRETORIO_RAIZ = diretorio_xml
         self.DIRETORIO_XML = f"{diretorio_xml}\\eventos"
         self.DIRETORIO_DOWNLOADS = f"{diretorio_xml}\\downloads"
         self.DIRETORIO_SAIDA = f"{diretorio_xml}\\saida"
         self.DIRETORIO_IMPORTAR = f"{diretorio_xml}\\importar"
 
-        self.BASE_DOMINIO = "Contabil"
-        self.USUARIO_DOMINIO = "EXTERNO"
-        self.SENHA_DOMINIO = "123456"
-        self.EMPRESA_PADRAO_RUBRICAS = "9999"
-
+        self.dicionario_rubricas_dominio = {} # Rubricas Domínio
         self.dicionario_s1010 = {} # Rubricas
         self.dicionario_s1200 = {} # Remuneração Regime Previdenciário Geral
         self.dicionario_s1202 = {} # Remuneração Regime Previdenciário Próprio
@@ -29,13 +27,67 @@ class eSocialXML():
         self.dicionario_s2299 = {} # Demissão
         self.dicionario_s2399 = {} # Demissão (contribuintes)
 
-    def baixar_dados_esocial(self, usuario, senha, certificado, tipo_certificado = "A1"):
+        # Parâmetros de operação
+        try:
+            self.carrega_parametros()
+        except:
+            self.base_dominio = "Contabil"
+            self.usuario_dominio = "EXTERNO"
+            self.senha_dominio = "123456"
+            self.empresa_padrao_rubricas = "9999"
+            self.usuario_esocial = ""
+            self.senha_esocial = ""
+            self.certificado_esocial = ""
+            self.tipo_certificado_esocial = "A1"
+
+    def carrega_parametros(self):
+        '''Carrega os parâmetros utilizados do arquivo parametros.json'''
+
+        f = open(f"{self.DIRETORIO_RAIZ}\\parametros.json","r")
+        parametros_texto = f.readline()
+        f.close
+
+        parametros = json.loads(parametros_texto)
+
+        self.base_dominio = parametros["base_dominio"]
+        self.usuario_dominio = parametros["usuario_dominio"]
+        self.senha_dominio = parametros["senha_dominio"]
+        self.empresa_padrao_rubricas = parametros["empresa_padrao_rubricas"]
+        self.usuario_esocial = parametros["usuario_esocial"]
+        self.senha_dominio = parametros["senha_dominio"]
+        self.certificado_esocial = parametros["certificado_esocial"]
+        self.tipo_certificado_esocial = parametros["tipo_certificado_esocial"]
+
+    def salvar_parametros(self):
+        '''Salva os parâmetros utilizados no arquivo parametros.json'''
+
+        parametros = {
+            "base_dominio": self.base_dominio,
+            "usuario_dominio": self.usuario_dominio,
+            "senha_dominio": self.senha_dominio,
+            "empresa_padrao_rubricas": self.empresa_padrao_rubricas,
+            "usuario_esocial": self.usuario_esocial,
+            "senha_esocial": self.senha_esocial,
+            "certificado_esocial": self.certificado_esocial,
+            "tipo_certificado_esocial": self.tipo_certificado_esocial
+        }
+
+        f = open(f"{self.DIRETORIO_RAIZ}\\parametros.json","w")
+        f.write(json.dumps(parametros))
+        f.close
+    
+    def baixar_dados_esocial(self):
         '''Acessa o portal e-Social com as credenciais necessárias e faz download dos arquivos do período'''
         pass
 
+    def configura_conexao_esocial(self,usuario,senha,certificado,tipo_certificado = "A1"):
+        '''Configura conexão da classe com o portal e-Social'''
+        self.usuario_esocial, self.senha_esocial, self.certificado_esocial, self.tipo_certificado_esocial = usuario, senha, certificado, tipo_certificado
+
     def configura_conexao_dominio(self,banco,usuario,senha,empresa_padrao = "9999"):
         '''Configura conexão da classe com o banco Domínio'''
-        self.BASE_DOMINIO, self.USUARIO_DOMINIO, self.SENHA_DOMINIO, self.EMPRESA_PADRAO_RUBRICAS = banco, usuario, senha, empresa_padrao
+        self.base_dominio, self.usuario_dominio, self.senha_dominio, self.empresa_padrao_rubricas = banco, usuario, senha, empresa_padrao
+        self.salvar_parametros()
 
     def extrair_arquivos_xml(self):
         '''Extrai os arquivos .zip que foram baixados do Portal e-Social'''
@@ -133,7 +185,9 @@ class eSocialXML():
                 print(f"Erro:{arquivo}")
                 print(e)
 
-        f = open("eventos_nao_tratados.json","w")
+        self.dicionario_s1010 = self.processar_rubricas()
+
+        f = open(f"{self.DIRETORIO_RAIZ}\\eventos_nao_tratados.json","w")
         f.write(json.dumps(eventos_nao_tratados))
         f.close()
 
@@ -195,21 +249,15 @@ class eSocialXML():
         dicionario_empresas = {}
         cgcs_rubricas = []
 
-        dicionario_rubricas = self.processar_rubricas()
-
-        conn = connect(
-            DSN=self.BASE_DOMINIO,
-            UID=self.USUARIO_DOMINIO,
-            PWD=self.SENHA_DOMINIO
-        )
+        engine = create_engine("sybase+pyodbc://{user}:{pw}@{dsn}".format(user=self.usuario_dominio, pw=self.senha_dominio, dsn=self.base_dominio))
 
         sql = "SELECT * FROM BETHADBA.GEEMPRE"
-        df_empresas = pd.read_sql(sql,conn)
+        df_empresas = pd.read_sql(sql,con=engine)
 
-        for rubrica in dicionario_rubricas:
-            inscricao = dicionario_rubricas.get(rubrica).get("ideEmpregador").get("nrInsc")
+        for rubrica in self.dicionario_s1010:
+            inscricao = self.dicionario_s1010.get(rubrica).get("ideEmpregador").get("nrInsc")
 
-            if(dicionario_rubricas.get(rubrica).get("ideEmpregador").get("tpInsc")=="1"):
+            if(self.dicionario_s1010.get(rubrica).get("ideEmpregador").get("tpInsc")=="1"):
                 inscricao = self.completar_cnpj(inscricao)
 
             if inscricao not in cgcs_rubricas:
@@ -230,55 +278,51 @@ class eSocialXML():
         result = []
         tipo = ""
         
-        conn = connect(
-            DSN=self.BASE_DOMINIO,
-            UID=self.USUARIO_DOMINIO,
-            PWD=self.SENHA_DOMINIO
-        )
-        
-        sql = f"SELECT * FROM BETHADBA.FOEVENTOS WHERE CODI_EMP = {self.EMPRESA_PADRAO_RUBRICAS}"
-        df_rubricas = pd.read_sql(sql,conn)
+        info_rubrica = rubrica.get('infoRubrica').get('inclusao').get('dadosRubrica')
 
-        info_rubrica = rubrica['infoRubrica']['inclusao']['dadosRubrica']
-
-        match int(info_rubrica['tpRubr']):
+        match int(info_rubrica.get('tpRubr')):
             case 1: tipo = "P"
             case 2: tipo = "D"
             case 3: tipo = "I"
             case 4: tipo = "ID"
         
-        rubesocial = info_rubrica['natRubr']
-        tpbaseinss = rubrica['codIncCP']
-        tpbaseirrf = rubrica['codIncIRRF']
-        tpbasefgts = rubrica['codIncFGTS']
+        descricao = info_rubrica.get('dscRubr')
+        rubesocial = info_rubrica.get('natRubr')
+        tpbaseinss = info_rubrica.get('codIncCP')
+        tpbaseirrf = info_rubrica.get('codIncIRRF')
+        tpbasefgts = info_rubrica.get('codIncFGTS')
+        tpbasesindical = info_rubrica.get('codIncSIND')
 
-        for i in range(len(df_rubricas)):
-            if(tipo==df_rubricas.loc[i,"prov_desc"]):
-                if str(rubesocial) in str(df_rubricas.loc[i,'natureza_folha_mensal']):
-                    if str(tpbaseinss) in str(df_rubricas.loc[i,'codigo_incidencia_inss_esocial']):
-                        if str(tpbaseirrf) in str(df_rubricas.loc[i,'codigo_incidencia_irrf_esocial']):
-                            if str(tpbasefgts) in str(df_rubricas.loc[i,'codigo_incidencia_fgts_esocial']):
-                                if str(tpbasefgts) in str(df_rubricas.loc[i,'codigo_incidencia_sindical_esocial']):
-                                    result.append(str(df_rubricas.loc[i,'i_eventos']))
+        for rubrica in self.dicionario_rubricas_dominio:
+            if(tipo==self.dicionario_rubricas_dominio.get(rubrica).get("tipo")):
+                if(rubesocial==self.dicionario_rubricas_dominio.get(rubrica).get("rubesocial")):
+                    if(tpbaseinss==self.dicionario_rubricas_dominio.get(rubrica).get("tpbaseinss")):
+                        if(tpbaseirrf==self.dicionario_rubricas_dominio.get(rubrica).get("tpbaseirrf")):
+                            if(tpbasefgts==self.dicionario_rubricas_dominio.get(rubrica).get("tpbasefgts")):
+                                if(tpbasesindical):
+                                    if(tpbasesindical==self.dicionario_rubricas_dominio.get(rubrica).get("tpbasesindical")):
+                                        result.append(str(self.dicionario_rubricas_dominio.get(rubrica).get("i_eventos")))
+                                else:
+                                    result.append(str(self.dicionario_rubricas_dominio.get(rubrica).get("i_eventos")))
 
         if(len(result)==0):
             # Comparação através do algoritmo de Levenshtein
             menor_distancia_levenshtein = 50
                     
-            for rubrica_dominio in self.dicionario_rubricas_esocial:
+            for rubrica in self.dicionario_rubricas_dominio:
                 distancia_levenshtein = Levenshtein.distance(
-                    rubrica["descricao"].upper(),
-                    self.dicionario_rubricas_esocial[rubrica_dominio]["nome"]
+                    descricao.upper(),
+                    str(self.dicionario_rubricas_dominio.get(rubrica).get("nome"))
                 )
 
                 if (distancia_levenshtein < menor_distancia_levenshtein):
                     menor_distancia_levenshtein = distancia_levenshtein
                     lista_relacoes_levenshtein = []
                     if(menor_distancia_levenshtein<3):
-                        lista_relacoes_levenshtein.append(str(rubrica_dominio))
+                        lista_relacoes_levenshtein.append(str(self.dicionario_rubricas_dominio.get(rubrica).get("i_eventos")))
                 elif (distancia_levenshtein==menor_distancia_levenshtein):
                     if(menor_distancia_levenshtein<3):
-                        lista_relacoes_levenshtein.append(str(rubrica_dominio))
+                        lista_relacoes_levenshtein.append(str(self.dicionario_rubricas_dominio.get(rubrica).get("i_eventos")))
 
             for relacao in lista_relacoes_levenshtein:
                 result.append(str(relacao))
@@ -306,7 +350,39 @@ class eSocialXML():
         cnpj = ''.join([str(item) for item in novo])
         return cnpj
 
-    def gera_excel_relacao(self, dicionario_relacoes, conversor):
+    def carregar_rubricas_dominio(self):
+        '''Carrega rubricas'''
+
+        self.dicionario_rubricas_dominio = {}
+        engine = create_engine("sybase+pyodbc://{user}:{pw}@{dsn}".format(user=self.usuario_dominio, pw=self.senha_dominio, dsn=self.base_dominio))
+        
+        sql = f"SELECT * FROM BETHADBA.FOEVENTOS WHERE CODI_EMP = {self.empresa_padrao_rubricas}"
+        df_rubricas = pd.read_sql(sql,con=engine)
+
+        for i in range(len(df_rubricas)):
+            i_eventos = str(df_rubricas.loc[i,'i_eventos'])
+            nome = df_rubricas.loc[i,"nome"]
+            tipo = df_rubricas.loc[i,"prov_desc"]
+            rubesocial = str(df_rubricas.loc[i,'NATUREZA_FOLHA_MENSAL'])
+            tpbaseinss = str(df_rubricas.loc[i,'CODIGO_INCIDENCIA_INSS_ESOCIAL'])
+            tpbaseirrf = str(df_rubricas.loc[i,'CODIGO_INCIDENCIA_IRRF_ESOCIAL'])
+            tpbasefgts = str(df_rubricas.loc[i,'CODIGO_INCIDENCIA_FGTS_ESOCIAL'])
+            tpbasesindical = str(df_rubricas.loc[i,'CODIGO_INCIDENCIA_SINDICAL_ESOCIAL'])
+
+            rubrica = {
+                "i_eventos": i_eventos,
+                "nome": nome,
+                "tipo": tipo,
+                "rubesocial": rubesocial,
+                "tpbaseinss": tpbaseinss,
+                "tpbaseirrf": tpbaseirrf,
+                "tpbasefgts": tpbasefgts,
+                "tpbasesindical": tpbasesindical
+            }
+
+            self.dicionario_rubricas_dominio[i_eventos] = rubrica
+    
+    def gera_excel_relacao(self):
         '''Gera o excel com as rubricas para relacionar com as rubricas padrão do Domínio'''
 
         linhas_excel_alerta = set()
@@ -315,31 +391,55 @@ class eSocialXML():
         linhas_excel_multirelacionado = set()
         relacao_dominio_esocial = {}
         lista_rubricas = []
-        
-        for s1010 in self.dicionario_s1010:
-            if (self.dicionario_s1010[s1010]["codigo_rubrica"] not in lista_rubricas):
-                lista_rubricas.append(self.dicionario_s1010[s1010]["codigo_rubrica"])
 
-                lista_relacoes = self.relaciona_rubricas(self.dicionario_s1010[s1010], dicionario_relacoes, conversor)
+        self.carregar_rubricas_dominio()
+        
+        print("Relacionando rubricas")
+        for s1010 in tqdm(self.dicionario_s1010):
+            codigo = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('ideRubrica').get('codRubr')
+
+            if (codigo not in lista_rubricas):
+                lista_rubricas.append(codigo)
+
+                info_rubrica = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('dadosRubrica')
+
+                match int(info_rubrica.get('tpRubr')):
+                    case 1: tipo = "P"
+                    case 2: tipo = "D"
+                    case 3: tipo = "I"
+                    case 4: tipo = "ID"
+                
+                nome = info_rubrica.get('dscRubr')
+                rubesocial = info_rubrica.get('natRubr')
+                tpbaseinss = info_rubrica.get('codIncCP')
+                tpbaseirrf = info_rubrica.get('codIncIRRF')
+                tpbasefgts = info_rubrica.get('codIncFGTS')
+                tpbasesindical = info_rubrica.get('codIncSIND')
+
+                lista_relacoes = self.relaciona_rubricas(self.dicionario_s1010.get(s1010))
 
                 if(len(lista_relacoes)==0):
                     linhas_excel_nao_relacionado.add((
-                        self.dicionario_s1010[s1010]["codigo_rubrica"],
-                        self.dicionario_s1010[s1010]["descricao"],
-                        self.dicionario_s1010[s1010]["natureza_rubrica"],
-                        self.dicionario_s1010[s1010]["incidencia_previdencia"],
-                        self.dicionario_s1010[s1010]["incidencia_irrf"],
-                        self.dicionario_s1010[s1010]["incidencia_fgts"],
+                        codigo,
+                        nome,
+                        tipo,
+                        rubesocial,
+                        tpbaseinss,
+                        tpbaseirrf,
+                        tpbasefgts,
+                        tpbasesindical,
                         "N"
                     ))
                 elif(len(lista_relacoes)==1):
                     linhas_excel_relacionado.add((
-                        self.dicionario_s1010[s1010]["codigo_rubrica"],
-                        self.dicionario_s1010[s1010]["descricao"],
-                        self.dicionario_s1010[s1010]["natureza_rubrica"],
-                        self.dicionario_s1010[s1010]["incidencia_previdencia"],
-                        self.dicionario_s1010[s1010]["incidencia_irrf"],
-                        self.dicionario_s1010[s1010]["incidencia_fgts"],
+                        codigo,
+                        nome,
+                        tipo,
+                        rubesocial,
+                        tpbaseinss,
+                        tpbaseirrf,
+                        tpbasefgts,
+                        tpbasesindical,
                         lista_relacoes[0],
                         "X"
                     ))
@@ -348,13 +448,16 @@ class eSocialXML():
                     relacao_dominio_esocial[lista_relacoes[0]].append(s1010)
                     
                 elif(len(lista_relacoes)>1):
+                    print("Multi-relações")
                     linha = [
-                        self.dicionario_s1010[s1010]["codigo_rubrica"],
-                        self.dicionario_s1010[s1010]["descricao"],
-                        self.dicionario_s1010[s1010]["natureza_rubrica"],
-                        self.dicionario_s1010[s1010]["incidencia_previdencia"],
-                        self.dicionario_s1010[s1010]["incidencia_irrf"],
-                        self.dicionario_s1010[s1010]["incidencia_fgts"],
+                        codigo,
+                        nome,
+                        tipo,
+                        rubesocial,
+                        tpbaseinss,
+                        tpbaseirrf,
+                        tpbasefgts,
+                        tpbasesindical,
                         ""
                     ]
 
@@ -364,7 +467,7 @@ class eSocialXML():
                         if(relacionamento_atual < len(lista_relacoes)):
                             if(self.dicionario_rubricas_esocial.get(int(lista_relacoes[relacionamento_atual]))!=None):
                                 linha.append(lista_relacoes[relacionamento_atual])
-                                linha.append(self.dicionario_rubricas_esocial.get(int(lista_relacoes[relacionamento_atual])).get("nome"))
+                                linha.append(self.dicionario_s1010.get(lista_relacoes[relacionamento_atual]).get("nome"))
 
                                 if(relacao_dominio_esocial.get(lista_relacoes[0])==None):
                                     relacao_dominio_esocial[lista_relacoes[0]] = []
@@ -379,28 +482,47 @@ class eSocialXML():
                     
                     linhas_excel_multirelacionado.add(tuple(linha))
                     
+        print("Imprimindo planilha")
         for relacao in relacao_dominio_esocial:
             if(len(relacao_dominio_esocial[relacao])>1):
                 for rubrica in relacao_dominio_esocial[relacao]:
+                    codigo = self.dicionario_s1010[rubrica]['infoRubrica']['inclusao']['ideRubrica']['codRubr']
+                    info_rubrica = self.dicionario_s1010.get(rubrica).get("infoRubrica").get("inclusao").get("dadosRubrica")
+
+                    match int(info_rubrica['tpRubr']):
+                        case 1: tipo = "P"
+                        case 2: tipo = "D"
+                        case 3: tipo = "I"
+                        case 4: tipo = "ID"
+                    
+                    nome = info_rubrica.get("dscRubr")
+                    rubesocial = info_rubrica.get("natRubr")
+                    tpbaseinss = info_rubrica.get("codIncCP")
+                    tpbaseirrf = info_rubrica.get("codIncIRRF")
+                    tpbasefgts = info_rubrica.get("codIncFGTS")
+                    tpbasesindical = info_rubrica.get("codIncSIND")
+
                     linhas_excel_alerta.add((
-                        self.dicionario_s1010[rubrica]["codigo_rubrica"],
-                        self.dicionario_s1010[rubrica]["descricao"],
-                        self.dicionario_s1010[rubrica]["natureza_rubrica"],
-                        self.dicionario_s1010[rubrica]["incidencia_previdencia"],
-                        self.dicionario_s1010[rubrica]["incidencia_irrf"],
-                        self.dicionario_s1010[rubrica]["incidencia_fgts"],
+                        codigo,
+                        nome,
+                        tipo,
+                        rubesocial,
+                        tpbaseinss,
+                        tpbaseirrf,
+                        tpbasefgts,
+                        tpbasesindical,
                         relacao,
                         "X"
                     ))
 
-        cabecalho_padrao = ['Código','Descrição','natureza_tributaria_rubrica','codigo_incidencia_inss_esocial','codigo_incidencia_irrf_esocial','codigo_incidencia_fgts_esocial']
+        cabecalho_padrao = ['Código','Descrição','Tipo','Natureza Tributaria Rubrica','Incidencia INSS eSocial','Incidencia IRRF eSocial','Incidencia FGTS eSocial','Incidencia Sindical eSocial']
         cabecalho_relacionado = cabecalho_padrao + ['Código Domínio','"X" para manter o relacionamento \nou \nInforme a rúbrica equivalente \nou \n"N" para cadastrar a rúbrica']
         cabecalho_multirelacionado = cabecalho_padrao + ['Informe a rúbrica equivalente \nou \n"N" para cadastrar a rúbrica','Opção 1','Descrição 1','Opção 2','Descrição 2','Opção 3','Descrição 3','Opção 4','Descrição 4','Opção 5','Descrição 5','Opção 6','Descrição 6','Opção 7','Descrição 7','Opção 8','Descrição 8','Opção 9','Descrição 9','Opção 10','Descrição 10']
         cabecalho_nao_relacionado =  cabecalho_padrao + ['Informe a rúbrica equivalente \nou \n"N" para cadastrar a rúbrica']
         cabecalho_alerta = cabecalho_padrao + ['Código Domínio', '"X" para somar as rúbricas \nou \n"D" para desconsiderar as rúbricas duplicadas \nou \nInforme a rúbrica equivalente \nou \n"N" para cadastrar a rúbrica']
 
         self.imprime_excel(
-            f'{self.DIRETORIO_XML}\\relacao_rubricas.xlsx', 
+            f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx', 
             linhas_excel_relacionado, 
             cabecalho_relacionado, 
             linhas_excel_multirelacionado, 
@@ -447,124 +569,128 @@ class eSocialXML():
         style_default = workbook.add_format()
         style_default.set_align('center')
 
-        try:
-            df1 = pd.DataFrame(data1)
-            df1.columns = header1
-            column_sort = header1[0]
-            df1 = df1.sort_values(by=[column_sort])
-            df1.to_excel(writer, sheet_name='Relacionado', startrow=1, header=False, index=False, na_rep='')
+        if(len(data1)>0):
+            try:
+                df1 = pd.DataFrame(data1)
+                df1.columns = header1
+                column_sort = header1[0]
+                df1 = df1.sort_values(by=[column_sort])
+                df1.to_excel(writer, sheet_name='Relacionado', startrow=1, header=False, index=False, na_rep='')
 
-            worksheet = writer.sheets['Relacionado']
-            worksheet.set_row(0, 80)
-            worksheet.set_column('A:XFD', None, style_default)
+                worksheet = writer.sheets['Relacionado']
+                worksheet.set_row(0, 80)
+                worksheet.set_column('A:XFD', None, style_default)
 
-            for col_num, value in enumerate(df1.columns.values):
-                if col_num < 7:
-                    worksheet.write(0, col_num, value, header_format_concorrente)
-                    column_len = df1[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
-                elif col_num == 7:
-                    worksheet.write(0, col_num, value, header_format_action)
-                    column_len = 35
-                else:
-                    worksheet.write(0, col_num, value, header_format_dominio)
-                    column_len = df1[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
+                for col_num, value in enumerate(df1.columns.values):
+                    if col_num < 7:
+                        worksheet.write(0, col_num, value, header_format_concorrente)
+                        column_len = df1[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
+                    elif col_num == 7:
+                        worksheet.write(0, col_num, value, header_format_action)
+                        column_len = 35
+                    else:
+                        worksheet.write(0, col_num, value, header_format_dominio)
+                        column_len = df1[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
 
-                worksheet.set_column(col_num, col_num, column_len)
+                    worksheet.set_column(col_num, col_num, column_len)
 
-        except:
-            print(f'Erro na aba "Relacionado": {str(e)}')
-            pass
+            except Exception as e:
+                print(f'Erro na aba "Relacionado": {str(e)}')
+                pass
         
-        try:
-            df2 = pd.DataFrame(data2)
-            df2.columns = header2
-            column_sort = header2[0]
-            df2 = df2.sort_values(by=[column_sort])
-            df2.to_excel(writer, sheet_name='+ de 1 result.', index=False, na_rep='')
+        if(len(data2)>0):
+            try:
+                df2 = pd.DataFrame(data2)
+                df2.columns = header2
+                column_sort = header2[0]
+                df2 = df2.sort_values(by=[column_sort])
+                df2.to_excel(writer, sheet_name='+ de 1 result.', index=False, na_rep='')
 
-            worksheet = writer.sheets['+ de 1 result.']
-            worksheet.set_row(0, 50)
-            worksheet.set_column('A:XFD', None, style_default)
+                worksheet = writer.sheets['+ de 1 result.']
+                worksheet.set_row(0, 50)
+                worksheet.set_column('A:XFD', None, style_default)
 
-            for col_num, value in enumerate(df2.columns.values):
-                if col_num < 6:
-                    worksheet.write(0, col_num, value, header_format_concorrente)
-                    column_len = df2[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
-                elif col_num == 6:
-                    worksheet.write(0, col_num, value, header_format_action)
-                    column_len = 35
-                else:
-                    worksheet.write(0, col_num, value, header_format_dominio)
-                    column_len = df2[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
+                for col_num, value in enumerate(df2.columns.values):
+                    if col_num < 6:
+                        worksheet.write(0, col_num, value, header_format_concorrente)
+                        column_len = df2[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
+                    elif col_num == 6:
+                        worksheet.write(0, col_num, value, header_format_action)
+                        column_len = 35
+                    else:
+                        worksheet.write(0, col_num, value, header_format_dominio)
+                        column_len = df2[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
 
-                worksheet.set_column(col_num, col_num, column_len)
-        except:
-            print(f'Erro na aba "+ de 1 result.": {str(e)}')
-            pass
+                    worksheet.set_column(col_num, col_num, column_len)
+            except Exception as e:
+                print(f'Erro na aba "+ de 1 result.": {str(e)}')
+                pass
         
-        try:
-            df3 = pd.DataFrame(data3)
-            df3.columns = header3
-            column_sort = header3[0]
-            df3 = df3.sort_values(by=[column_sort])
-            df3.to_excel(writer, sheet_name='Sem result.', index=False, na_rep='')
+        if(len(data3)>0):
+            try:
+                df3 = pd.DataFrame(data3)
+                df3.columns = header3
+                column_sort = header3[0]
+                df3 = df3.sort_values(by=[column_sort])
+                df3.to_excel(writer, sheet_name='Sem result.', index=False, na_rep='')
 
-            worksheet = writer.sheets['Sem result.']
-            worksheet.set_row(0, 50)
-            worksheet.set_column('A:XFD', None, style_default)
+                worksheet = writer.sheets['Sem result.']
+                worksheet.set_row(0, 50)
+                worksheet.set_column('A:XFD', None, style_default)
 
-            for col_num, value in enumerate(df3.columns.values):
-                if col_num < 6:
-                    worksheet.write(0, col_num, value, header_format_concorrente)
-                    column_len = df3[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
-                elif col_num == 6:
-                    worksheet.write(0, col_num, value, header_format_action)
-                    column_len = 35
-                else:
-                    worksheet.write(0, col_num, value, header_format_dominio)
-                    column_len = df3[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
+                for col_num, value in enumerate(df3.columns.values):
+                    if col_num < 6:
+                        worksheet.write(0, col_num, value, header_format_concorrente)
+                        column_len = df3[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
+                    elif col_num == 6:
+                        worksheet.write(0, col_num, value, header_format_action)
+                        column_len = 35
+                    else:
+                        worksheet.write(0, col_num, value, header_format_dominio)
+                        column_len = df3[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
 
-                worksheet.set_column(col_num, col_num, column_len)
-        except:
-            print(f'Erro na aba "Sem result.": {str(e)}')
-            pass
+                    worksheet.set_column(col_num, col_num, column_len)
+            except Exception as e:
+                print(f'Erro na aba "Sem result.": {str(e)}')
+                pass
 
-        try:
-            df4 = pd.DataFrame(data4)
-            df4.columns = header4
-            column_sort = header4[6]
-            df4 = df4.sort_values(by=[column_sort])
-            df4.to_excel(writer, sheet_name='Alerta', index=False, na_rep='')
+        if(len(data4)>0):
+            try:
+                df4 = pd.DataFrame(data4)
+                df4.columns = header4
+                column_sort = header4[6]
+                df4 = df4.sort_values(by=[column_sort])
+                df4.to_excel(writer, sheet_name='Alerta', index=False, na_rep='')
 
-            worksheet = writer.sheets['Alerta']
-            worksheet.set_row(0, 110)
-            worksheet.set_column('A:XFD', None, style_default)
+                worksheet = writer.sheets['Alerta']
+                worksheet.set_row(0, 110)
+                worksheet.set_column('A:XFD', None, style_default)
 
-            for col_num, value in enumerate(df4.columns.values):
-                if col_num < 7:
-                    worksheet.write(0, col_num, value, header_format_concorrente)
-                    column_len = df4[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
-                elif col_num == 7:
-                    worksheet.write(0, col_num, value, header_format_action)
-                    column_len = 45
-                else:
-                    worksheet.write(0, col_num, value, header_format_dominio)
-                    column_len = df4[value].astype(str).str.len().max()
-                    column_len = max(column_len, len(value)) + 3
+                for col_num, value in enumerate(df4.columns.values):
+                    if col_num < 7:
+                        worksheet.write(0, col_num, value, header_format_concorrente)
+                        column_len = df4[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
+                    elif col_num == 7:
+                        worksheet.write(0, col_num, value, header_format_action)
+                        column_len = 45
+                    else:
+                        worksheet.write(0, col_num, value, header_format_dominio)
+                        column_len = df4[value].astype(str).str.len().max()
+                        column_len = max(column_len, len(value)) + 3
 
-                worksheet.set_column(col_num, col_num, column_len)
-        except Exception as e:
-            print(f'Erro na aba "Alertas": {str(e)}')
-            pass
+                    worksheet.set_column(col_num, col_num, column_len)
+            except Exception as e:
+                print(f'Erro na aba "Alertas": {str(e)}')
+                pass
 
-        writer.save()
+        writer.close()
 
     def gerar_arquivos_saida(self):
         tabela_FOEVENTOS = []

@@ -4,10 +4,9 @@ from src.esocial import eSocialXML
 os.system("cls")
 esocial = eSocialXML("xml")
 esocial.carregar_informacoes_xml()
-esocial.configura_conexao_dominio("movto_esocial","EXTERNO","123456")
 
-print(type(esocial.relaciona_empresas()))
-print(esocial.relaciona_empresas())
+relacao_empresas = esocial.relaciona_empresas()
+esocial.gera_excel_relacao()
 
 esocial.gerar_afastamentos_importacao()
 esocial.gerar_ferias_importacao()
