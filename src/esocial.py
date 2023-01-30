@@ -1,6 +1,5 @@
 import os, shutil, json, xmltodict, Levenshtein
 from tqdm import tqdm
-from pyodbc import connect
 from sqlalchemy import create_engine
 import xml.dom.minidom as xml
 import pandas as pd
@@ -280,6 +279,31 @@ class eSocialXML():
                 }
 
         return dicionario_empresas
+
+    def relaciona_empregados(self):
+        """
+        Gera um dicionário dos empregados que cada empresa possui, deixando como chave o
+        CPF do empregado
+        """
+        data_employees = {}
+
+        engine = create_engine("sybase+pyodbc://{user}:{pw}@{dsn}".format(user=self.usuario_dominio, pw=self.senha_dominio, dsn=self.base_dominio))
+
+        sql = "SELECT CODI_EMP, I_EMPREGADOS, CPF FROM BETHADBA.FOEMPREGADOS"
+        df_empregados = pd.read_sql(sql, con=engine)
+
+        for index, line in df_empregados.iterrows():
+            codi_emp = str(line.get('CODI_EMP'))
+            i_empregados = str(line.get('I_EMPREGADOS'))
+            cpf = str(line.get('CPF'))
+
+            if codi_emp not in data_employees.keys():
+                data_employees[codi_emp] = {}
+
+            if cpf not in data_employees[codi_emp].keys():
+                data_employees[codi_emp][cpf] = i_empregados
+
+        return data_employees
 
     def relaciona_rubricas(self, rubrica):
         '''Recebe como parâmetro uma rúbrica do concorrente e faz uma série de validações para relacionar com uma correspondente na Domínio.'''
@@ -750,7 +774,7 @@ class eSocialXML():
             table.set_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL', sindicato)
             tabela_FOEVENTOS.append(table.do_output())
 
-    def gerar_afastamentos_importacao(self):
+    def gerar_afastamentos_importacao(self, relacao_empresas, relacao_empregados):
         """
         Gera o arquivo FOAFASTAMENTOS_IMPORTACAO
         """
@@ -780,7 +804,6 @@ class eSocialXML():
             if not is_null(data_inicio) and not is_null(data_fim):
                 data_afastamentos_xml.add(infos_afastamento, [cnpj_empregador, cpf_empregado, data_inicio])
             if is_null(data_fim):
-                # print(cpf_empregado, data_inicio, infos_afastamento)
                 data_afastamentos_xml_incompleto.add(infos_afastamento, [cnpj_empregador, cpf_empregado, 'INICIO', data_inicio])
             if is_null(data_inicio):
                 data_afastamentos_xml_incompleto.add(infos_afastamento, [cnpj_empregador, cpf_empregado, 'FIM', data_fim])
@@ -828,8 +851,11 @@ class eSocialXML():
             for cpf_empregado in data_afastamentos_xml.get([cnpj_empregador]):
                 for data_inicio in data_afastamentos_xml.get([cnpj_empregador, cpf_empregado]):
                     infos_afastamento = data_afastamentos_xml.get([cnpj_empregador, cpf_empregado, data_inicio])
-                    codi_emp = '1'
-                    i_empregados = '1'
+                    codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
+                    i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+
+                    if is_null(codi_emp) or is_null(i_empregados):
+                        continue
 
                     data_fim = ''
                     if infos_afastamento.get('fimAfastamento') is not None:
@@ -866,8 +892,14 @@ class eSocialXML():
 
         # demissões empregados
         for s2299 in self.dicionario_s2299:
-            codi_emp = '1'
-            i_empregados = '1'
+            cnpj_empregador = self.dicionario_s2299[s2299].get("ideEmpregador").get("nrInsc")
+            cpf_empregado = self.dicionario_s2299[s2299].get("ideVinculo").get("cpfTrab")
+
+            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
+            i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+
+            if is_null(codi_emp) or is_null(i_empregados):
+                continue
 
             data_desligamento = self.dicionario_s2299[s2299].get("infoDeslig").get("dtDeslig")
             data_real_demissao = add_day_to_date(data_desligamento, '%Y-%m-%d', 1)
@@ -881,8 +913,14 @@ class eSocialXML():
 
         # demissões contribuintes
         for s2399 in self.dicionario_s2399:
-            codi_emp = '1'
-            i_empregados = '1'
+            cnpj_empregador = self.dicionario_s2399[s2399].get("ideEmpregador").get("nrInsc")
+            cpf_empregado = self.dicionario_s2399[s2399].get("ideTrabSemVinculo").get("cpfTrab")
+
+            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
+            i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+
+            if is_null(codi_emp) or is_null(i_empregados):
+                continue
 
             data_demissao = self.dicionario_s2399[s2399].get("infoTSVTermino").get("dtTerm")
             table = Table('FOAFASTAMENTOS_IMPORTACAO')
@@ -895,7 +933,7 @@ class eSocialXML():
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOAFASTAMENTOS_IMPORTACAO.txt', data_foafastamentos_importacao)
 
-    def gerar_ferias_importacao(self):
+    def gerar_ferias_importacao(self, relacao_empresas, relacao_empregados):
         """
         Gera os arquivos FOFERIAS_AQUISITIVOS e FOFERIAS_GOZO
         """
@@ -962,8 +1000,11 @@ class eSocialXML():
             # Afastamentos de férias é código 15 no eSocial
             if motivo != '15': continue
 
-            codi_emp = '1'
-            i_empregados = '1'
+            codi_emp = str(relacao_empresas.get(insc_empresa).get('codigo'))
+            i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+
+            if is_null(codi_emp) or is_null(i_empregados):
+                continue
 
             data_inicio_aquisitivo = ''
             data_fim_aquisitivo = ''
