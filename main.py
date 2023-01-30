@@ -1,5 +1,4 @@
 import os, json, sys
-sys.path.append(sys.path[0]+"\\src")
 from src.esocial import eSocialXML
 
 os.system("cls")
@@ -8,6 +7,9 @@ esocial.carregar_informacoes_xml()
 
 relacao_empresas = esocial.relaciona_empresas()
 esocial.gera_excel_relacao(relacao_empresas)
+
+esocial.gerar_afastamentos_importacao()
+esocial.gerar_ferias_importacao()
 
 '''f = open("s1010.json","w")
 f.write(json.dumps(esocial.processar_rubricas()))

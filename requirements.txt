@@ -1,0 +1,6 @@
+xmltodict
+pyodbc
+pandas
+Levenshtein
+tqdm
+dateutil
