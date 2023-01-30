@@ -777,6 +777,7 @@ class eSocialXML():
             infos_pagto = self.dicionario_s1200[s1200].get('dmDev')
 
             complete_competence = self.dicionario_s1200[s1200].get('ideEvento').get('perApur')
+            original_competence = self.dicionario_s1200[s1200].get('ideEvento').get('perApur')
             if len(complete_competence) == 4:
                 # preenche o mês 12 e dia como 01
                 complete_competence += '-12-01'
@@ -800,6 +801,18 @@ class eSocialXML():
                     events_to_handle.extend(infos_events)
                 else:
                     events_to_handle.append(infos_events)
+
+                # 11 é evento de folha mensal
+                # 41 é evento de adiantamento
+                # 51 é evento de adiantamento 13º
+                # 52 é evento de 13º integral
+                # 70 é evento de PLR
+                # 42 é evento de folha complementar
+                tipo_processo = '11'
+
+                # se a competência vier só com o ano, se refere a pagamento de 13º
+                if len(original_competence) == 4:
+                    tipo_processo = '52'
 
                 for line in events_to_handle:
                     i_eventos = line.get('codRubr')
@@ -831,7 +844,7 @@ class eSocialXML():
                     table = Table('FOLANCAMENTOS_EVENTOS')
                     table.set_value('CODI_EMP', codi_emp)
                     table.set_value('I_EMPREGADOS', i_empregados)
-                    table.set_value('TIPO_PROCESSO', '1')
+                    table.set_value('TIPO_PROCESSO', tipo_processo)
                     table.set_value('COMPETENCIA_INICIAL', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
                     table.set_value('DATA_PAGAMENTO_ALTERA_CALCULO', transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y'))
                     table.set_value('I_EVENTOS', i_eventos)
