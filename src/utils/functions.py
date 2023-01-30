@@ -6,6 +6,7 @@ import chardet
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import json
+import pandas as pd
 
 def print_to_import(output_file, data):
     """
@@ -252,3 +253,167 @@ def get_year(str_date):
     """
     year = str_date[:4]
     return year
+
+
+def read_rubric_relationship(file):
+    """
+    Recebe como parâmetro o arquivo excel que contém o relacionamento de eventos e retorna um dicionário
+    e uma lista, o dicionário contém o relacionamnto de rubricas e a lista contém as rubricas que devem ser geradas para importar
+    """
+    rubrics_relationship = {}
+    generate_rubrics = []
+    ignore_rubrics = []
+    base = pd.ExcelFile(file)
+
+    # Aba 'Relacionado' da planilha
+    try:
+        aux = pd.read_excel(base, 'Relacionado')
+        data_preset = trim_all_columns(aux)
+
+        # formatar cabeçalho, pois senão a query não funciona corretamente
+        data_preset.columns = format_header(data_preset.columns)
+
+        # cria um dataset para cada situação que pode ocorrer
+        # coleta as linhas que tem valor 'X' que significa relacionamento correto
+        data = data_preset.query(
+            'x_para_manter_o_relacionamento_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica == "X"')
+
+        # coleta as linhas que tem valor 'N' que significa para gerar essa rubrica para importação
+        data2 = data_preset.query(
+            'x_para_manter_o_relacionamento_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica == "N"')
+
+        # coleta as linhas que não tem nem 'X' nem 'N' que significa que fizeram um novo relacionamento de rúbrica
+        data3 = data_preset.query(
+            '(x_para_manter_o_relacionamento_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "X") & (x_para_manter_o_relacionamento_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "N")')
+
+        # adiciona na lista de relacionamentos
+        for row in data.to_dict(orient='records'):
+            rubrics_relationship[int(row['codigo'])] = row['codigo_dominio']
+
+        # adiciona na lista de rubricas para serem importadas
+        for row in data2.to_dict(orient='records'):
+            generate_rubrics.append(row)
+
+        # adiciona na lista de relacionamentos levando em conta o novo relacionamento feito manualmente
+        for row in data3.to_dict(orient='records'):
+            rubrics_relationship[int(row['codigo'])] = row[
+                'x_para_manter_o_relacionamento_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica']
+    except:
+        pass
+
+    # Aba '+ de 1 result.' da planilha
+    try:
+        aux = pd.read_excel(base, '+ de 1 result.')
+        data_preset = trim_all_columns(aux)
+
+        # formatar cabeçalho, pois senão a query não funciona corretamente
+        data_preset.columns = format_header(data_preset.columns)
+
+        # cria um dataset para cada situação que pode ocorrer
+        # coleta as linhas que tem valor 'N' que significa para gerar essa rubrica para importação
+        data = data_preset.query('informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica == "N"')
+
+        # coleta as linhas que não tem 'N' que significa que fizeram um novo relacionamento de rúbrica
+        data2 = data_preset.query('informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "N"')
+
+        # adiciona na lista de rubricas para serem importadas
+        for row in data.to_dict(orient='records'):
+            generate_rubrics.append(row)
+
+        # adiciona na lista de relacionamentos levando em conta o novo relacionamento feito manualmente
+        for row in data2.to_dict(orient='records'):
+            rubrics_relationship[int(row['codigo'])] = row[
+                'informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica']
+    except:
+        pass
+
+    # Aba 'Sem result.' da planilha
+    try:
+        aux = pd.read_excel(base, 'Sem result.')
+        data_preset = trim_all_columns(aux)
+
+        # formatar cabeçalho, pois senão a query não funciona corretamente
+        data_preset.columns = format_header(data_preset.columns)
+
+        # cria um dataset para cada situação que pode ocorrer
+        # coleta as linhas que tem valor 'N' que significa para gerar essa rubrica para importação
+        data = data_preset.query('informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica == "N"')
+
+        # coleta as linhas que não tem 'N' que significa que fizeram um novo relacionamento de rúbrica
+        data2 = data_preset.query('informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "N"')
+
+        # adiciona na lista de rubricas para serem importadas
+        for row in data.to_dict(orient='records'):
+            generate_rubrics.append(row)
+
+        # adiciona na lista de relacionamentos levando em conta o novo relacionamento feito manualmente
+        for row in data2.to_dict(orient='records'):
+            rubrics_relationship[int(row['codigo'])] = row[
+                'informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica']
+    except:
+        pass
+
+    # Aba 'Alerta' da planilha
+    try:
+        aux = pd.read_excel(base, 'Alerta')
+        data_preset = trim_all_columns(aux)
+
+        # formatar cabeçalho, pois senão a query não funciona corretamente
+        data_preset.columns = format_header(data_preset.columns)
+
+        # coleta as linhas que tem valor 'N' que significa para gerar essa rubrica para importação
+        data = data_preset.query(
+            'x_para_somar_as_rubricas_ou_d_para_desconsiderar_as_rubricas_duplicadas_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica == "N"')
+
+        # coleta as linhas que tem valor 'D' que significa para ignorar as linhas duplicadas
+        data2 = data_preset.query(
+            'x_para_somar_as_rubricas_ou_d_para_desconsiderar_as_rubricas_duplicadas_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica == "D"')
+
+        # coleta as linhas que não tem nem 'X' nem 'N' que significa que fizeram um novo relacionamento de rúbrica
+        data3 = data_preset.query(
+            '(x_para_somar_as_rubricas_ou_d_para_desconsiderar_as_rubricas_duplicadas_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "X") & (x_para_somar_as_rubricas_ou_d_para_desconsiderar_as_rubricas_duplicadas_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "N") & (x_para_somar_as_rubricas_ou_d_para_desconsiderar_as_rubricas_duplicadas_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "D")')
+
+        # adiciona na lista de rubricas para serem importadas
+        for row in data.to_dict(orient='records'):
+            generate_rubrics.append(row)
+
+        # adiciona na lista de rubricas para serem ignoradas se duplicarem
+        for row in data2.to_dict(orient='records'):
+            ignore_rubrics.append(int(row['codigo_dominio']))
+
+        # adiciona na lista de relacionamentos levando em conta o novo relacionamento feito manualmente
+        for row in data3.to_dict(orient='records'):
+            rubrics_relationship[int(row['codigo'])] = row[
+                'x_para_somar_as_rubricas_ou_d_para_desconsiderar_as_rubricas_duplicadas_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica']
+    except:
+        pass
+
+    return rubrics_relationship, generate_rubrics, ignore_rubrics
+
+
+def trim_all_columns(df):
+    """
+    Trim whitespace from ends of each value across all series in dataframe
+    """
+    trim_strings = lambda x: x.strip() if isinstance(x, str) else x
+    return df.applymap(trim_strings)
+
+
+def format_header(columns):
+    """
+    Recebe o cabeçalho de uma planilha e retira alguns caracteres indesejados
+    """
+    new_columns = []
+    new_columns = [column.replace(' ', '_') for column in columns]
+    new_columns = [column.replace('-', '_') for column in new_columns]
+    new_columns = [column.replace('"', '') for column in new_columns]
+    new_columns = [column.lower() for column in new_columns]
+    new_columns = [column.replace('í', 'i') for column in new_columns]
+    new_columns = [column.replace('ó', 'o') for column in new_columns]
+    new_columns = [column.replace('ú', 'u') for column in new_columns]
+    new_columns = [column.replace('ã', 'a') for column in new_columns]
+    new_columns = [column.replace('â', 'a') for column in new_columns]
+    new_columns = [column.replace('ç', 'c') for column in new_columns]
+    new_columns = [column.replace('\n', '') for column in new_columns]
+
+    return new_columns

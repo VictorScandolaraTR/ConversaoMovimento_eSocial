@@ -704,50 +704,39 @@ class eSocialXML():
         writer.close()
 
     def gerar_arquivos_saida(self):
-        tabela_FOEVENTOS = []
+        """
+        Gravar os arquivos de eventos, lançamentos e médias para importação
+        """
+        # lê a planilha de relacionamento de eventos
+        rubrics_relationship, generate_rubrics, ignore_rubrics = read_rubric_relationship(f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx')
 
-        dicionario_s1010 = self.processar_rubricas()
+        rubrics_importation = []
+        for rubric in generate_rubrics:
 
-        for s1010 in dicionario_s1010:
-            inscricao = dicionario_s1010[s1010].get("ideEmpregador").get("nrInsc")
-            codigo_rubrica = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("ideRubrica").get("codRubr")
-            descricao = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("dscRubr")
-            natureza = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("natRubr")
-            tipo = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("tpRubr")
-            inss = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("codIncCP")
-            irrf = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("codIncIRRF")
-            fgts = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("codIncFGTS")
-            sindicato = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("codIncSIND")
-
-            match tipo:
-                case 1: tipo = "P" # Vencimento, provento ou pensão
-                case 2: tipo = "D" # Desconto
-                case 3: tipo = "I" # Informativa
-                case 4: tipo = "ID" # Informativa dedutora
+            codi_emp = '1'
+            i_eventos = rubric.get('codigo')
+            descricao = rubric.get('descricao')
+            tipo = rubric.get('tipo')
+            natureza_tributaria_rubrica = rubric.get('natureza_tributaria_rubrica')
+            incidencia_inss = rubric.get('incidencia_inss_esocial')
+            incidencia_irrf = rubric.get('incidencia_irrf_esocial')
+            incidencia_fgts = rubric.get('incidencia_fgts_esocial')
+            incidencia_sindicato = rubric.get('incidencia_sindical_esocial')
 
             table = Table('FOEVENTOS')
-            table.set_value('CODI_EMP', inscricao)
-            table.set_value('I_EVENTOS', codigo_rubrica)
+            table.set_value('CODI_EMP', codi_emp)
+            table.set_value('I_EVENTOS', i_eventos)
             table.set_value('NOME', descricao)
             table.set_value('PROV_DESC', tipo)
-            table.set_value('NATUREZA_FOLHA_MENSAL', natureza)
-            table.set_value('CODIGO_INCIDENCIA_INSS_ESOCIAL', inss)
-            table.set_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL', irrf)
-            table.set_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL', fgts)
-            table.set_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL', sindicato)
-            tabela_FOEVENTOS.append(table.do_output())
+            table.set_value('NATUREZA_FOLHA_MENSAL', natureza_tributaria_rubrica)
+            table.set_value('CODIGO_INCIDENCIA_INSS_ESOCIAL', incidencia_inss)
+            table.set_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL', incidencia_irrf)
+            table.set_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL', incidencia_fgts)
+            table.set_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL', incidencia_sindicato)
 
-            table = Table('FOEVENTOS')
-            table.set_value('CODI_EMP', inscricao)
-            table.set_value('I_EVENTOS', codigo_rubrica)
-            table.set_value('NOME', descricao)
-            table.set_value('PROV_DESC', tipo)
-            table.set_value('NATUREZA_FOLHA_MENSAL', natureza)
-            table.set_value('CODIGO_INCIDENCIA_INSS_ESOCIAL', inss)
-            table.set_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL', irrf)
-            table.set_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL', fgts)
-            table.set_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL', sindicato)
-            tabela_FOEVENTOS.append(table.do_output())
+            rubrics_importation.append(table.do_output())
+
+        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOEVENTOS.txt', rubrics_importation)
 
     def gerar_afastamentos_importacao(self):
         """
