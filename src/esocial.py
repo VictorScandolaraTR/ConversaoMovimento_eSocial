@@ -1,6 +1,5 @@
 import os, shutil, json, xmltodict, Levenshtein
 from tqdm import tqdm
-from pyodbc import connect
 from sqlalchemy import create_engine
 import xml.dom.minidom as xml
 import pandas as pd

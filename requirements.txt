@@ -3,4 +3,6 @@ pyodbc
 pandas
 Levenshtein
 tqdm
-dateutil
+python-dateutil
+sqlalchemy
+sqlalchemy-sybase
