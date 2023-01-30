@@ -728,7 +728,7 @@ class eSocialXML():
 
         writer.close()
 
-    def gerar_arquivos_saida(self):
+    def gerar_arquivos_saida(self, relacao_empresas, relacao_empregados):
         """
         Gravar os arquivos de eventos, lançamentos e médias para importação
         """
@@ -736,9 +736,10 @@ class eSocialXML():
         rubrics_relationship, generate_rubrics, ignore_rubrics = read_rubric_relationship(f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx')
 
         rubrics_importation = []
+        data_lancamentos_eventos = []
+        data_lancto_medias = []
         for rubric in generate_rubrics:
 
-            codi_emp = '1'
             i_eventos = rubric.get('codigo')
             descricao = rubric.get('descricao')
             tipo = rubric.get('tipo')
@@ -749,7 +750,6 @@ class eSocialXML():
             incidencia_sindicato = rubric.get('incidencia_sindical_esocial')
 
             table = Table('FOEVENTOS')
-            table.set_value('CODI_EMP', codi_emp)
             table.set_value('I_EVENTOS', i_eventos)
             table.set_value('NOME', descricao)
             table.set_value('PROV_DESC', tipo)
@@ -761,7 +761,63 @@ class eSocialXML():
 
             rubrics_importation.append(table.do_output())
 
+        # coletar datas de pagamento
+        payment_data = self.load_date_payment()
+
+        for s1200 in self.dicionario_s1200:
+            cnpj_empregador = self.dicionario_s1200[s1200].get('ideEmpregador').get('nrInsc')
+            cpf_empregado = self.dicionario_s1200[s1200].get('ideTrabalhador').get('cpfTrab')
+
+            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
+            i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+
+            if is_null(codi_emp) or is_null(i_empregados):
+                continue
+
+            original_competence = self.dicionario_s1200[s1200].get('ideEvento').get('perApur')
+            competence = f"{self.dicionario_s1200[s1200].get('ideEvento').get('perApur')}-01"
+            infos_pagto = self.dicionario_s1200[s1200].get('dmDev')
+
+            itens_to_handle = []
+            if isinstance(infos_pagto, list):
+                itens_to_handle.extend(infos_pagto)
+            else:
+                itens_to_handle.append(infos_pagto)
+
+            for item in itens_to_handle:
+                infos_events = item.get('infoPerApur').get('ideEstabLot').get('remunPerApur').get('itensRemun')
+
+                events_to_handle = []
+                if isinstance(infos_events, list):
+                    events_to_handle.extend(infos_events)
+                else:
+                    events_to_handle.append(infos_events)
+
+                for line in events_to_handle:
+                    data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, original_competence])
+                    i_eventos = line.get('codRubr')
+                    valor_calculado = line.get('vrRubr')
+
+                    valor_informado = '1'
+                    if line.get('fatorRubr') is not None:
+                        valor_informado = line.get('fatorRubr')
+
+                    table = Table('FOLANCAMENTOS_EVENTOS')
+                    table.set_value('CODI_EMP', codi_emp)
+                    table.set_value('I_EMPREGADOS', i_empregados)
+                    table.set_value('TIPO_PROCESSO', '1')
+                    table.set_value('COMPETENCIA_INICIAL', transform_date(competence, '%Y-%m-%d', '%d/%m/%Y'))
+                    table.set_value('DATA_PAGAMENTO_ALTERA_CALCULO', transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y'))
+                    table.set_value('I_EVENTOS', i_eventos)
+                    table.set_value('VALOR_INFORMADO', valor_informado)
+                    table.set_value('VALOR_CALCULADO', valor_calculado)
+                    table.set_value('ORIGEM_REGISTRO', '3')
+
+                    data_lancamentos_eventos.append(table.do_output())
+
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOEVENTOS.txt', rubrics_importation)
+        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCAMENTOS_EVENTOS.txt', data_lancamentos_eventos)
+        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCTO_MEDIAS.txt', data_lancto_medias)
 
     def gerar_afastamentos_importacao(self, relacao_empresas, relacao_empregados):
         """
@@ -932,52 +988,8 @@ class eSocialXML():
         sequencial_aquisitivos = Sequencial()
         sequencial_gozos = Sequencial()
         check_aquisitivos = StorageData()
-        payment_data = StorageData()
 
-        # guarda os dados de férias que vem no evento de pagamento
-        for s1210 in self.dicionario_s1210:
-            insc_empresa = self.dicionario_s1210[s1210].get('ideEmpregador').get('nrInsc')
-            cpf_empregado = self.dicionario_s1210[s1210].get('ideBenef').get('cpfBenef')
-
-            competence = self.dicionario_s1210[s1210].get('ideEvento').get('perApur')
-            infos_pagto = self.dicionario_s1210[s1210].get('ideBenef').get('infoPgto')
-
-            # as vezes as informações de pagamento vem em um unico objeto, e
-            # outras vem em uma lista de objetos
-            if isinstance(infos_pagto, dict):
-                data_pagto = infos_pagto.get('dtPgto')
-            elif isinstance(infos_pagto, list):
-                data_pagto = ''
-
-                # percorre a lista de infos sobre o pagamento e coleta a data
-                # de pagamento daquela que for referente a mesma competência
-                for item in infos_pagto:
-                    if item.get('detPgtoFl') is not None:
-                        ref_competence = item.get('detPgtoFl').get('perRef')
-                    else:
-                        ref_competence = item.get('perRef')
-
-                    if competence == ref_competence:
-                        data_pagto = item.get('dtPgto')
-
-                # as vezes em vez da competência vem somente o ano do pagamento
-                # dessa forma coletamos também quando o ano for igual ao da competência
-                if is_null(data_pagto):
-                    for item in infos_pagto:
-                        if item.get('detPgtoFl') is not None:
-                            ref_competence = item.get('detPgtoFl').get('perRef')
-                        else:
-                            ref_competence = item.get('perRef')
-
-                        if not is_null(ref_competence) and len(ref_competence) == 4:
-                            if get_year(competence) == get_year(ref_competence):
-                                data_pagto = item.get('dtPgto')
-                        elif competence == ref_competence:
-                            data_pagto = item.get('dtPgto')
-            else:
-                data_pagto = ''
-
-            payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
+        payment_data = self.load_date_payment()
 
         for s2230 in self.dicionario_s2230:
             insc_empresa = self.dicionario_s2230[s2230].get('ideEmpregador').get('nrInsc')
@@ -1087,3 +1099,54 @@ class eSocialXML():
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_AQUISITIVOS.txt', data_foferias_aquisitivos)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_GOZO.txt', data_foferias_gozo)
+
+    def load_date_payment(self):
+        """
+        Carrega as datas de pagamento do evento 1210
+        """
+        payment_data = StorageData()
+        for s1210 in self.dicionario_s1210:
+            insc_empresa = self.dicionario_s1210[s1210].get('ideEmpregador').get('nrInsc')
+            cpf_empregado = self.dicionario_s1210[s1210].get('ideBenef').get('cpfBenef')
+
+            competence = self.dicionario_s1210[s1210].get('ideEvento').get('perApur')
+            infos_pagto = self.dicionario_s1210[s1210].get('ideBenef').get('infoPgto')
+
+            # as vezes as informações de pagamento vem em um unico objeto, e
+            # outras vem em uma lista de objetos
+            if isinstance(infos_pagto, dict):
+                data_pagto = infos_pagto.get('dtPgto')
+            elif isinstance(infos_pagto, list):
+                data_pagto = ''
+
+                # percorre a lista de infos sobre o pagamento e coleta a data
+                # de pagamento daquela que for referente a mesma competência
+                for item in infos_pagto:
+                    if item.get('detPgtoFl') is not None:
+                        ref_competence = item.get('detPgtoFl').get('perRef')
+                    else:
+                        ref_competence = item.get('perRef')
+
+                    if competence == ref_competence:
+                        data_pagto = item.get('dtPgto')
+
+                # as vezes em vez da competência vem somente o ano do pagamento
+                # dessa forma coletamos também quando o ano for igual ao da competência
+                if is_null(data_pagto):
+                    for item in infos_pagto:
+                        if item.get('detPgtoFl') is not None:
+                            ref_competence = item.get('detPgtoFl').get('perRef')
+                        else:
+                            ref_competence = item.get('perRef')
+
+                        if not is_null(ref_competence) and len(ref_competence) == 4:
+                            if get_year(competence) == get_year(ref_competence):
+                                data_pagto = item.get('dtPgto')
+                        elif competence == ref_competence:
+                            data_pagto = item.get('dtPgto')
+            else:
+                data_pagto = ''
+
+            payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
+
+        return payment_data

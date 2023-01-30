@@ -13,7 +13,7 @@ esocial.gera_excel_relacao(relacao_empresas)
 esocial.gerar_afastamentos_importacao(relacao_empresas, relacao_empregados)
 esocial.gerar_ferias_importacao(relacao_empresas, relacao_empregados)
 
-esocial.gerar_arquivos_saida()
+esocial.gerar_arquivos_saida(relacao_empresas, relacao_empregados)
 
 '''f = open("s1010.json","w")
 f.write(json.dumps(esocial.processar_rubricas()))
