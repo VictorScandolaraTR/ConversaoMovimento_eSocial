@@ -235,3 +235,20 @@ def add_year_to_date(str_date, years, date_format, default_value_error='NULO'):
         return (date + relativedelta(years=int(years))).strftime("%d/%m/%Y")
     except:
         return default_value_error
+
+
+def get_competence(str_date):
+    """
+    Recebe uma data no formato YYYY-MM-DD e retorna a competência
+    no formato YYYY-MM
+    """
+    competence = str_date[:7]
+    return competence
+
+
+def get_year(str_date):
+    """
+    Recebe uma data no formato YYYY-MM-DD e retorna o ano que está informado
+    """
+    year = str_date[:4]
+    return year

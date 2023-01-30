@@ -767,7 +767,57 @@ class eSocialXML():
         sequencial_aquisitivos = Sequencial()
         sequencial_gozos = Sequencial()
         check_aquisitivos = StorageData()
+        payment_data = StorageData()
+
+        # guarda os dados de férias que vem no evento de pagamento
+        for s1210 in self.dicionario_s1210:
+            insc_empresa = self.dicionario_s1210[s1210].get('ideEmpregador').get('nrInsc')
+            cpf_empregado = self.dicionario_s1210[s1210].get('ideBenef').get('cpfBenef')
+
+            competence = self.dicionario_s1210[s1210].get('ideEvento').get('perApur')
+            infos_pagto = self.dicionario_s1210[s1210].get('ideBenef').get('infoPgto')
+
+            # as vezes as informações de pagamento vem em um unico objeto, e
+            # outras vem em uma lista de objetos
+            if isinstance(infos_pagto, dict):
+                data_pagto = infos_pagto.get('dtPgto')
+            elif isinstance(infos_pagto, list):
+                data_pagto = ''
+
+                # percorre a lista de infos sobre o pagamento e coleta a data
+                # de pagamento daquela que for referente a mesma competência
+                for item in infos_pagto:
+                    if item.get('detPgtoFl') is not None:
+                        ref_competence = item.get('detPgtoFl').get('perRef')
+                    else:
+                        ref_competence = item.get('perRef')
+
+                    if competence == ref_competence:
+                        data_pagto = item.get('dtPgto')
+
+                # as vezes em vez da competência vem somente o ano do pagamento
+                # dessa forma coletamos também quando o ano for igual ao da competência
+                if is_null(data_pagto):
+                    for item in infos_pagto:
+                        if item.get('detPgtoFl') is not None:
+                            ref_competence = item.get('detPgtoFl').get('perRef')
+                        else:
+                            ref_competence = item.get('perRef')
+
+                        if not is_null(ref_competence) and len(ref_competence) == 4:
+                            if get_year(competence) == get_year(ref_competence):
+                                data_pagto = item.get('dtPgto')
+                        elif competence == ref_competence:
+                            data_pagto = item.get('dtPgto')
+            else:
+                data_pagto = ''
+
+            payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
+
         for s2230 in self.dicionario_s2230:
+            insc_empresa = self.dicionario_s2230[s2230].get('ideEmpregador').get('nrInsc')
+            cpf_empregado = self.dicionario_s2230[s2230].get('ideVinculo').get('cpfTrab')
+
             infos_afastamento = self.dicionario_s2230[s2230].get("infoAfastamento")
             motivo = infos_afastamento.get('iniAfastamento').get("codMotAfast")
 
@@ -822,13 +872,14 @@ class eSocialXML():
             # ignora se não houver inicio e fim do aquisitivo
             if is_null(data_inicio_gozo) or is_null(data_fim_gozo): continue
 
+            competencia = get_competence(data_inicio_gozo)
             i_ferias_gozo = sequencial_gozos.add([codi_emp, i_empregados])
             i_ferias_aquisitivos = check_aquisitivos.get([codi_emp, i_empregados, data_inicio_aquisitivo])
 
-            # Falta encontrar no XML
+            # Falta encontrar no XML as datas de abono
             abono_inicio = ''
             abono_fim = ''
-            data_pagamento = ''
+            data_pagamento = payment_data.get([insc_empresa, cpf_empregado, competencia])
 
             abono_paga = 'N'
             if not is_null(abono_inicio) and not is_null(abono_fim):
@@ -854,7 +905,7 @@ class eSocialXML():
             table.set_value('ABONO_PAGA', abono_paga)
             table.set_value('ABONO_INICIO', abono_inicio)
             table.set_value('ABONO_FIM', abono_fim)
-            table.set_value('DATA_PAGTO', data_pagamento)
+            table.set_value('DATA_PAGTO', transform_date(data_pagamento, '%Y-%m-%d', '%d/%m/%Y'))
             table.set_value('PAGA_AD13', '')
             table.set_value('TIPO', '1')
             table.set_value('GOZO_INICIO_DN', gozo_inicio_dn)
