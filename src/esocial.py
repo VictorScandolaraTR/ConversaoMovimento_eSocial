@@ -736,9 +736,9 @@ class eSocialXML():
         """
         Gravar os arquivos de eventos, lançamentos e médias para importação
         """
-        rubrics_relationship, generate_rubrics, ignore_rubrics = read_rubric_relationship(f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx')
-        handle_lauch_rubrics = self.handle_lauch_rubrics()
         rubrics_relationship = StorageData()
+        general_rubrics_relationship, generate_rubrics, ignore_rubrics = read_rubric_relationship(f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx')
+        handle_lauch_rubrics = self.handle_lauch_rubrics()
 
         rubrics_esocial = self.generate_rubricas_esocial(generate_rubrics)
         companies_rubrics = self.read_companies_rubrics(relacao_empresas, handle_lauch_rubrics)
@@ -746,6 +746,9 @@ class eSocialXML():
 
         data_lancamentos_eventos = []
         data_lancto_medias = []
+
+        # Completa o de/para de rúbricas de cada empresa, com os relacionamentos feitos na planilha
+        load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_rubrics_relationship)
 
         # coletar datas de pagamento
         payment_data = self.load_date_payment()
@@ -770,7 +773,7 @@ class eSocialXML():
 
             competence = get_competence(complete_competence)
 
-            i_eventos = line.get('codRubr')
+            i_eventos = rubrics_relationship.get([codi_emp, str(line.get('codRubr'))])
             valor_calculado = line.get('vrRubr')
 
             # Se estiver dentro da competência a ser calculada gera como lançamento
@@ -1347,7 +1350,7 @@ class eSocialXML():
                         table.set_value('CODIGO_ESOCIAL', codigo_esocial)
 
                         # salva o relacionamento da rúbrica
-                        rubrics_relationship.add(i_eventos_importation, [codi_emp_eve, i_eventos])
+                        rubrics_relationship.add(i_eventos_importation, [str(codi_emp_eve), str(i_eventos)])
 
                         # se tiver incidência no IRRF, marca a rubrica para compor a DIRF
                         if format_int(table.get_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL')) in [11, 12, 13]:
@@ -1689,3 +1692,10 @@ def generate_default_base(codi_emp, i_eventos, i_cadbases):
     table_calc.set_value('COMPANY_ID', '00000000000000000000000000000000')
 
     return table_calc.do_output()
+
+
+def load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_rubrics_relationship):
+    for i_eventos in companies_rubrics:
+        for codi_emp in companies_rubrics.get(i_eventos):
+            i_eventos_importation = general_rubrics_relationship.get(i_eventos)
+            rubrics_relationship.add(i_eventos_importation, [str(codi_emp), str(i_eventos)])
