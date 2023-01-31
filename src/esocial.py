@@ -767,6 +767,7 @@ class eSocialXML():
         for s1200 in self.dicionario_s1200:
             cnpj_empregador = self.dicionario_s1200[s1200].get('ideEmpregador').get('nrInsc')
             cpf_empregado = self.dicionario_s1200[s1200].get('ideTrabalhador').get('cpfTrab')
+            indicativo_apuracao = self.dicionario_s1200[s1200].get('ideEvento').get('indApuracao')
 
             codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
@@ -810,8 +811,8 @@ class eSocialXML():
                 # 42 é evento de folha complementar
                 tipo_processo = '11'
 
-                # se a competência vier só com o ano, se refere a pagamento de 13º
-                if len(original_competence) == 4:
+                # Se for indicativo 2, é referente a 13º salário integral
+                if indicativo_apuracao == '2':
                     tipo_processo = '52'
 
                 for line in events_to_handle:
