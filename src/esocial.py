@@ -7,7 +7,9 @@ import pandas as pd
 from src.classes.Table import Table
 from src.classes.StorageData import StorageData
 from src.classes.Sequencial import Sequencial
+from src.database.Sybase import Sybase
 from src.utils.functions import *
+from src.database.data_rubrics import *
 
 class eSocialXML():
     def __init__(self, diretorio_xml):
@@ -734,12 +736,13 @@ class eSocialXML():
         """
         Gravar os arquivos de eventos, lançamentos e médias para importação
         """
-        # lê a planilha de relacionamento de eventos
         rubrics_relationship, generate_rubrics, ignore_rubrics = read_rubric_relationship(f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx')
         handle_lauch_rubrics = self.handle_lauch_rubrics()
+        rubrics_relationship = StorageData()
 
-        rubrics_importation = self.generate_rubricas_importation(generate_rubrics)
+        rubrics_esocial = self.generate_rubricas_esocial(generate_rubrics)
         companies_rubrics = self.read_companies_rubrics(relacao_empresas, handle_lauch_rubrics)
+        rubrics_importation, rubrics_base_calc_importation, rubrics_formula = self.complete_data_rubrics(rubrics_esocial, companies_rubrics, rubrics_relationship)
 
         data_lancamentos_eventos = []
         data_lancto_medias = []
@@ -843,6 +846,8 @@ class eSocialXML():
                 data_lancto_medias.append(table.do_output())
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOEVENTOS.txt', rubrics_importation)
+        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOEVENTOSBASES.txt', rubrics_base_calc_importation)
+        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFORMULAS.txt', rubrics_formula)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCAMENTOS_EVENTOS.txt', data_lancamentos_eventos)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCTO_MEDIAS.txt', data_lancto_medias)
 
@@ -1178,14 +1183,14 @@ class eSocialXML():
 
         return payment_data
 
-    def generate_rubricas_importation(self, generate_rubrics):
+    def generate_rubricas_esocial(self, generate_rubrics):
         """
         Alimenta o cadastro da rúbrica com os campos que vem do eSocial
         """
         rubrics_importation = []
         for rubric in generate_rubrics:
 
-            i_eventos = rubric.get('codigo')
+            i_eventos = int(rubric.get('codigo'))
             descricao = rubric.get('descricao')
             tipo = rubric.get('tipo')
             natureza_tributaria_rubrica = rubric.get('natureza_tributaria_rubrica')
@@ -1217,7 +1222,7 @@ class eSocialXML():
         for line in handle_lauch_rubrics:
             cnpj_empregador = line.get('nrInsc')
             codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
-            i_eventos = line.get('codRubr')
+            i_eventos = int(line.get('codRubr'))
 
             # adiciona a rubrica na lista de rubricas utilizadas pela empresa
             if i_eventos not in companies_rubrics.keys():
@@ -1264,3 +1269,423 @@ class eSocialXML():
                     new_data.append(new_line)
 
         return new_data
+
+    def complete_data_rubrics(self, rubrics_esocial, companies_rubrics, rubrics_relationship):
+        """
+        Complementa a tabela de rúbricas com alguma equivalente do contábil, e gera também as bases de cálculo
+        e fórmulas necessárias
+        """
+        # campos que virão dos dados do eSocial
+        not_overwrite_keys = [
+            'NOME',
+            'PROV_DESC',
+            'NATUREZA_FOLHA_MENSAL',
+            'CODIGO_INCIDENCIA_INSS_ESOCIAL',
+            'CODIGO_INCIDENCIA_IRRF_ESOCIAL',
+            'CODIGO_INCIDENCIA_FGTS_ESOCIAL',
+            'CODIGO_INCIDENCIA_SINDICAL_ESOCIAL'
+        ]
+        sybase = Sybase(self.base_dominio, self.usuario_dominio, self.senha_dominio)
+        connection = sybase.connect()
+
+        data_rubrics, data_base_calc_rubrics, data_formula_rubrics = sybase.select_data_rubrics(connection, self.empresa_padrao_rubricas)
+        rubrics_averages = sybase.select_rubrics_averages(connection, self.empresa_padrao_rubricas)
+        uses_company_rubrics = sybase.select_companies_to_use_rubrics(connection)
+        dominio_rubrics = sybase.select_rubrics(connection)
+        dominio_rubrics_esocial = sybase.select_codigo_esocial_rubrics(connection)
+        cnpj_companies = sybase.select_cnpj_companies(connection)
+
+        rubrics_importation = []
+        rubrics_base_calc_importation = []
+        rubrics_formula = []
+        check_importated_rubrics = StorageData()
+        for line_rubric in rubrics_esocial:
+            i_eventos = line_rubric.get('I_EVENTOS')
+            if i_eventos in companies_rubrics.keys():
+                for codi_emp in companies_rubrics.get(i_eventos):
+                    table = Table('FOEVENTOS')
+
+                    rubric_calc_base = {}
+                    rubric_formula = {}
+
+                    natureza_folha_mensal = line_rubric.get('NATUREZA_FOLHA_MENSAL')
+                    if natureza_folha_mensal in data_rubrics.keys():
+
+                        natureza_folha_mensal_dominio, index_rubric = self.search_similar_rubric(line_rubric, data_rubrics)
+                        if index_rubric:
+
+                            # copiar campos da rubrica do Domínio
+                            for column in data_rubrics[natureza_folha_mensal_dominio][index_rubric]:
+                                column_value = data_rubrics[natureza_folha_mensal_dominio][index_rubric][column]
+                                if not is_null(column_value) and str(column_value) != 'None':
+                                    table.set_value(column, column_value)
+
+                            # Copiar base de cálculo e fórmula se tiver
+                            if table.get_value('I_EVENTOS') in data_base_calc_rubrics.keys():
+                                rubric_calc_base = data_base_calc_rubrics[table.get_value('I_EVENTOS')]
+
+                            if table.get_value('I_EVENTOS') in data_formula_rubrics.keys():
+                                rubric_formula = data_formula_rubrics[table.get_value('I_EVENTOS')]
+
+                    # copiar campos que vem dos dados do eSocial
+                    for field in not_overwrite_keys:
+                        table.set_value(field, line_rubric.get(field))
+
+                    # Algumas empresas podem replicar rubricas de outras, aqui buscamos o código da empresa
+                    # onde a rubrica deve ser importada
+                    codi_emp_eve = uses_company_rubrics.get(codi_emp)
+
+                    # checa se rubrica já não foi criada na empresa
+                    if not check_importated_rubrics.exist([codi_emp_eve, i_eventos]):
+                        check_importated_rubrics.add('True', [codi_emp_eve, i_eventos])
+
+                        table.set_value('CODI_EMP', codi_emp_eve)
+                        table.set_value('NOME', format_name_rubric(line_rubric.get('NOME')))
+
+                        i_eventos_importation, codigo_esocial = self.generate_i_evento(codi_emp_eve, dominio_rubrics, dominio_rubrics_esocial, cnpj_companies)
+                        table.set_value('I_EVENTOS', i_eventos_importation)
+                        table.set_value('CODIGO_ESOCIAL', codigo_esocial)
+
+                        # salva o relacionamento da rúbrica
+                        rubrics_relationship.add(i_eventos_importation, [codi_emp_eve, i_eventos])
+
+                        # se tiver incidência no IRRF, marca a rubrica para compor a DIRF
+                        if format_int(table.get_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL')) in [11, 12, 13]:
+                            table.set_value('SOMA_INF_REN', 'S')
+                            table.set_value('REND_TRIBUTAVEIS', '1')
+                        else:
+                            table.set_value('SOMA_INF_REN', 'N')
+                            table.set_value('REND_TRIBUTAVEIS', '0')
+
+                        rubrics_importation.append(table.do_output())
+
+                        # checa se a rubrica deve entrar para médias
+                        if str(table.get_value('SOMA_MEDIA_AVISO_PREVIO')) == '1':
+                            if str(table.get_value('SOMA_MED_13')) == 'S':
+                                if str(table.get_value('SOMA_MED_FER')) == 'S':
+                                    if str(table.get_value('SOMA_MEDIA_LICENCA_PREMIO')) == '1':
+                                        if str(table.get_value('SOMA_MED_AFAST')) == 'S':
+                                            if str(table.get_value('SOMA_MEDIA_SALDO_SALARIO')) == '1':
+                                                if str(table.get_value('I_EVENTOS')) not in rubrics_averages:
+                                                    rubrics_averages.append(str(table.get_value('I_EVENTOS')))
+
+                        # para os tipos de rubricas que possuem formula
+                        if rubric_formula:
+                            table_formula = Table('FOFORMULAS')
+                            table_formula.set_value('CODI_EMP', table.get_value('CODI_EMP'))
+                            table_formula.set_value('I_EVENTOS', table.get_value('I_EVENTOS'))
+                            table_formula.set_value('SCRIPT', rubric_formula.get('SCRIPT'))
+                            table_formula.set_value('FIL1', rubric_formula.get('FIL1'))
+                            table_formula.set_value('FIL2', rubric_formula.get('FIL2'))
+                            table_formula.set_value('FIL3', rubric_formula.get('FIL3'))
+                            table_formula.set_value('FIL4', rubric_formula.get('FIL4'))
+                            rubrics_formula.append(table_formula.do_output())
+
+                        # gera as bases de cálculo para a rúbrica
+                        incidencia_inss = table.get_value('CODIGO_INCIDENCIA_INSS_ESOCIAL')
+                        incidencia_irrf = table.get_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL')
+                        incidencia_fgts = table.get_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL')
+                        incidencia_sindical = table.get_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL')
+
+                        # marca qual base de INSS precisa ser gerada conforme a incidência da rubrica
+                        base_inss_mensal, base_inss_empresa_mensal, base_inss_terceiros_mensal, base_inss_rat_mensal = get_incidencia_inss(incidencia_inss)
+
+                        # marca qual base de IRRF precisa ser gerada conforme a incidência da rubrica
+                        base_irrf = get_incidencia_irrf(incidencia_irrf)
+
+                        # marca qual base de FGTS precisa ser gerada conforme a incidência da rubrica
+                        base_fgts = get_incidencia_fgts(incidencia_fgts)
+
+                        if rubric_calc_base:
+                            for base_calc in rubric_calc_base:
+                                if not is_a_valid_base(incidencia_irrf, incidencia_inss, incidencia_fgts, incidencia_sindical, base_calc['I_CADBASES']):
+                                    continue
+
+                                # se a rubrica já tiver a base, não precisa ser gerada
+                                if base_inss_mensal == format_int(base_calc['I_CADBASES']):
+                                    base_inss_mensal = False
+
+                                if base_inss_empresa_mensal == format_int(base_calc['I_CADBASES']):
+                                    base_inss_empresa_mensal = False
+
+                                if base_inss_terceiros_mensal == format_int(base_calc['I_CADBASES']):
+                                    base_inss_terceiros_mensal = False
+
+                                if base_inss_rat_mensal == format_int(base_calc['I_CADBASES']):
+                                    base_inss_rat_mensal = False
+
+                                if base_irrf == format_int(base_calc['I_CADBASES']):
+                                    base_irrf = False
+
+                                if base_fgts == format_int(base_calc['I_CADBASES']):
+                                    base_fgts = False
+
+                                table_calc = Table('FOEVENTOSBASES')
+                                table_calc.set_value('CODI_EMP', table.get_value('CODI_EMP'))
+                                table_calc.set_value('I_EVENTOS', table.get_value('I_EVENTOS'))
+                                table_calc.set_value('I_CADBASES', base_calc['I_CADBASES'])
+                                table_calc.set_value('ENVIAR_ESOCIAL', base_calc['ENVIAR_ESOCIAL'])
+                                table_calc.set_value('INCLUSAO_VALIDADA_ESOCIAL', base_calc['INCLUSAO_VALIDADA_ESOCIAL'])
+                                table_calc.set_value('GERAR_RETIFICACAO_ESOCIAL', base_calc['GERAR_RETIFICACAO_ESOCIAL'])
+                                table_calc.set_value('PROCESSAR_EXCLUSAO_ESOCIAL', base_calc['PROCESSAR_EXCLUSAO_ESOCIAL'])
+                                table_calc.set_value('COMPANY_ID', base_calc['COMPANY_ID'])
+
+                                rubrics_base_calc_importation.append(table_calc.do_output())
+
+                        # gera a base de calculo se a rubrica tiver com determinada incidência marcada
+                        if base_inss_mensal:
+                            default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_inss_mensal)
+                            rubrics_base_calc_importation.append(default_base)
+
+                        if base_inss_empresa_mensal:
+                            default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_inss_empresa_mensal)
+                            rubrics_base_calc_importation.append(default_base)
+
+                        if base_inss_terceiros_mensal:
+                            default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_inss_terceiros_mensal)
+                            rubrics_base_calc_importation.append(default_base)
+
+                        if base_inss_rat_mensal:
+                            default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_inss_rat_mensal)
+                            rubrics_base_calc_importation.append(default_base)
+
+                        if base_irrf:
+                            default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_irrf)
+                            rubrics_base_calc_importation.append(default_base)
+
+                        if base_fgts:
+                            default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_fgts)
+                            rubrics_base_calc_importation.append(default_base)
+
+        return rubrics_importation, rubrics_base_calc_importation, rubrics_formula
+
+    def search_similar_rubric(self, rubric, data_rubrics):
+        """
+        Procura uma rúbrica da Domínio o mais similar possível com a rúbrica da importação
+        e retorna os campos NATUREZA_FOLHA_MENSAL e I_EVENTOS da rubrica encontrada
+        """
+        natureza_folha_mensal_dominio = ''
+        index_rubric = ''
+
+        fields_to_compare = [
+            'PROV_DESC',
+            'CODIGO_INCIDENCIA_INSS_ESOCIAL',
+            'CODIGO_INCIDENCIA_IRRF_ESOCIAL',
+            'CODIGO_INCIDENCIA_FGTS_ESOCIAL',
+            'CODIGO_INCIDENCIA_SINDICAL_ESOCIAL'
+        ]
+
+        # Vai checando qual a rúbrica com mais tem campos iguais
+        natureza_folha_mensal = rubric.get('NATUREZA_FOLHA_MENSAL')
+        if str(natureza_folha_mensal) not in 'NULO' and natureza_folha_mensal in data_rubrics.keys():
+            if len(data_rubrics[natureza_folha_mensal]) > 1:
+                old_advance = 0
+                for dominio_rubric in data_rubrics[natureza_folha_mensal]:
+                    advance = 0
+                    for number_field, field in enumerate(fields_to_compare):
+                        if str(dominio_rubric.get(field)) == str(rubric.get(field)):
+                            advance += 1
+                            if len(fields_to_compare) == (number_field+1):
+                                natureza_folha_mensal_dominio = dominio_rubric.get('NATUREZA_FOLHA_MENSAL')
+                                index_rubric = data_rubrics[natureza_folha_mensal].index(dominio_rubric)
+                        else:
+                            if advance > old_advance:
+                                natureza_folha_mensal_dominio = dominio_rubric.get('NATUREZA_FOLHA_MENSAL')
+                                index_rubric = data_rubrics[natureza_folha_mensal].index(dominio_rubric)
+                                old_advance = int(advance)
+
+        return natureza_folha_mensal_dominio, index_rubric
+
+    def generate_i_evento(self, codi_emp_eventos, dominio_rubrics, dominio_rubrics_esocial, cnpj_companies):
+        """
+        Gera um código de evento válido, dentro do range permitido(maior que 201).
+        E retorna o código da rubrica e o código eSocial
+        """
+        i_evento = 201
+        codigo_esocial = 201
+        raiz_cnpj = str(cnpj_companies[codi_emp_eventos])[0:8]
+
+        while True:
+            if i_evento in dominio_rubrics[codi_emp_eventos]:
+                i_evento += 1
+            else:
+                codigo_esocial = i_evento
+                while True:
+                    if str(codigo_esocial) in dominio_rubrics_esocial[raiz_cnpj]:
+                        codigo_esocial += 1
+                    else:
+                        break
+                break
+
+        dominio_rubrics[codi_emp_eventos].append(i_evento)
+        dominio_rubrics_esocial[raiz_cnpj].append(str(codigo_esocial))
+        return i_evento, codigo_esocial
+
+
+def get_incidencia_inss(incidencia):
+    """
+    Retorna os códigos de bases respectivos de cada incidência de base de INSS
+    """
+    base_inss_mensal = False
+    base_inss_empresa_mensal = False
+    base_inss_terceiros_mensal = False
+    base_inss_rat_mensal = False
+
+    if format_int(incidencia) in [11, 12, 13]:
+        base_inss_mensal, base_inss_empresa_mensal, base_inss_terceiros_mensal, base_inss_rat_mensal = incidencias_bases_INSS.get(str(incidencia))
+
+    return base_inss_mensal, base_inss_empresa_mensal, base_inss_terceiros_mensal, base_inss_rat_mensal
+
+
+def get_incidencia_irrf(incidencia):
+    """
+    Retorna os códigos de bases respectivos de cada incidência de base de IRRF
+    """
+    base_irrf = False
+
+    if format_int(incidencia) in [11, 12, 13]:
+        base_irrf = incidencias_bases_IRRF.get(str(incidencia))[0]
+
+    return base_irrf
+
+
+def get_incidencia_fgts(incidencia):
+    """
+    Retorna os códigos de bases respectivos de cada incidência de base de FGTS
+    """
+    base_fgts = False
+
+    if format_int(incidencia) in [11, 12]:
+        base_fgts = incidencias_bases_FGTS.get(str(incidencia))[0]
+
+    return base_fgts
+
+
+def check_inss_irrf_fgts_base(tipo, incidencia, i_cad_base):
+    """
+    Checa se a base de INSS, IRRF e FGTS estão de acordo com a incidência da rubrica.
+    Exemplo: rubrica está com incidência de IRRF mensal marcada e tem uma base de IRRF férias.
+    """
+    formated_i_cad_base = format_int(i_cad_base)
+    if tipo == 'IRRF':
+        if str(incidencia) in incidencias_bases_IRRF.keys():
+            if formated_i_cad_base in get_all_incidencias('IRRF'):
+                return formated_i_cad_base == get_incidencia_irrf(incidencia)
+            else:
+                return True
+        else:
+            return True
+    if tipo == 'INSS':
+        if str(incidencia) in incidencias_bases_INSS.keys():
+            if formated_i_cad_base in get_all_incidencias('INSS'):
+                return formated_i_cad_base in get_incidencia_inss(incidencia)
+            else:
+                return True
+        else:
+            return True
+    if tipo == 'FGTS':
+        if str(incidencia) in incidencias_bases_FGTS.keys():
+            if formated_i_cad_base in get_all_incidencias('FGTS'):
+                return formated_i_cad_base == get_incidencia_fgts(incidencia)
+            else:
+                return True
+        else:
+            return True
+
+
+def get_all_incidencias(tipo):
+    """
+    Retorna todos os códigos de bases que podem ser incidências de IRRF, FGTS ou INSS
+    """
+    result = []
+    values = []
+    if tipo == 'INSS':
+        values = incidencias_bases_INSS.values()
+    elif tipo == 'IRRF':
+        values = incidencias_bases_IRRF.values()
+    elif tipo == 'FGTS':
+        values = incidencias_bases_FGTS.values()
+
+    for lista_bases in values:
+        result.extend(lista_bases)
+
+    return result
+
+
+def ignore_base_calc(base, base_calc):
+    """"
+    Função para validar se a base de calculo é uma base referente a IRRF, INSS, FGTS ou Sindical
+    """
+    if base in 'IRRF':
+        if int(base_calc) in i_cadbases_irrf:
+            return True
+
+    if base in 'INSS':
+        if int(base_calc) in i_cadbases_inss:
+            return True
+
+    if base in 'FGTS':
+        if int(base_calc) in i_cadbases_fgts:
+            return True
+
+    if base in 'SINDICAL':
+        if int(base_calc) == 6:
+            return True
+
+    return False
+
+def is_a_valid_base(incidencia_irrf, incidencia_inss, incidencia_fgts, incidencia_sindical, i_cadbases):
+    """
+    Valida se o código da base está valida de acordo com a incidência da rúbrica
+    """
+    # se tiver desmarcada a incidência de IRRF, retira as bases de calculo referente ao IRRF
+    if not is_null(incidencia_irrf):
+        if format_int(incidencia_irrf) in [0, 9]:
+            if ignore_base_calc('IRRF', i_cadbases):
+                return False
+        else:
+            if not check_inss_irrf_fgts_base('IRRF', incidencia_irrf, i_cadbases):
+                return False
+
+    # se tiver desmarcada a incidência de INSS, retira as bases de calculo referente ao INSS
+    if not is_null(incidencia_inss):
+        if format_int(incidencia_inss) in [0]:
+            if ignore_base_calc('INSS', i_cadbases):
+                return False
+        else:
+            if not check_inss_irrf_fgts_base('INSS', incidencia_inss, i_cadbases):
+                return False
+
+    # se tiver desmarcada a incidência de FGTS, retira as bases de calculo referente ao FGTS
+    if not is_null(incidencia_fgts):
+        if format_int(incidencia_fgts) in [0]:
+            if ignore_base_calc('FGTS', i_cadbases):
+                return False
+        else:
+            if not check_inss_irrf_fgts_base('FGTS', incidencia_fgts, i_cadbases):
+                return False
+
+    # se tiver desmarcada a incidência SINDICAL, retira as bases de calculo referente ao sindicato
+    if not is_null(incidencia_sindical):
+        if format_int(incidencia_sindical) in [0]:
+            if ignore_base_calc('SINDICAL', i_cadbases):
+                return False
+
+    return True
+
+
+def generate_default_base(codi_emp, i_eventos, i_cadbases):
+    """
+    Gerar um registro padrão da tabela FOEVENTOSBASES com os dados passados por parâmetro
+    """
+    table_calc = Table('FOEVENTOSBASES')
+    table_calc.set_value('CODI_EMP', codi_emp)
+    table_calc.set_value('I_EVENTOS', i_eventos)
+    table_calc.set_value('I_CADBASES', i_cadbases)
+    table_calc.set_value('ENVIAR_ESOCIAL', 1)
+    table_calc.set_value('INCLUSAO_VALIDADA_ESOCIAL', 0)
+    table_calc.set_value('GERAR_RETIFICACAO_ESOCIAL', 0)
+    table_calc.set_value('PROCESSAR_EXCLUSAO_ESOCIAL', 0)
+    table_calc.set_value('COMPANY_ID', '00000000000000000000000000000000')
+
+    return table_calc.do_output()

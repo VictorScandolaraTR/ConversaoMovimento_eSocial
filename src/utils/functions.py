@@ -429,3 +429,30 @@ def format_header(columns):
     new_columns = [column.replace('\n', '') for column in new_columns]
 
     return new_columns
+
+
+def format_name_rubric(name):
+    """
+    Formata o nome da rubrica, pois tem algumas regras no sistema Domíno,
+    além disso adiciona o sufixo 'CONV.' para indicar que é uma rubrica
+    do concorrente
+    """
+    aux = str(name).replace('-', '')
+    aux = aux.replace('.', '')
+    new_name = f'CONV. {aux[0:34]}'
+    return new_name
+
+def format_int(value, default_value_error=False, default_value=''):
+    """
+    Formatar valor para inteiro.
+    Em casos de erro é possível configurar um retorno padrão com as
+    variáveis "default_value_error" e "default_value"
+    """
+    try:
+        int(value)
+        return int(value)
+    except:
+        if default_value_error:
+            return default_value
+        else:
+            return False
