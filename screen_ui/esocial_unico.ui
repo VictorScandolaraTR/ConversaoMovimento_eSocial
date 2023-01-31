@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QLabel" name="label">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>60</y>
+      <width>47</width>
+      <height>13</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Inscrição</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btn_adiciona_empresa">
+    <property name="geometry">
+     <rect>
+      <x>180</x>
+      <y>60</y>
+      <width>75</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Adicionar</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="edit_inscricao">
+    <property name="geometry">
+     <rect>
+      <x>70</x>
+      <y>59</y>
+      <width>113</width>
+      <height>20</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QTableWidget" name="tableWidget">
+    <property name="enabled">
+     <bool>true</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>15</x>
+      <y>101</y>
+      <width>761</width>
+      <height>451</height>
+     </rect>
+    </property>
+    <property name="editTriggers">
+     <set>QAbstractItemView::NoEditTriggers</set>
+    </property>
+    <property name="selectionMode">
+     <enum>QAbstractItemView::SingleSelection</enum>
+    </property>
+    <property name="selectionBehavior">
+     <enum>QAbstractItemView::SelectRows</enum>
+    </property>
+    <column>
+     <property name="text">
+      <string>Inscrição</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>Código Domínio</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>Nome Domínio</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>Status</string>
+     </property>
+    </column>
+   </widget>
+   <widget class="QPushButton" name="btn_obtem_dados_esocial">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>560</y>
+      <width>150</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Obter dados do e-Social</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btn_executa_rpa">
+    <property name="geometry">
+     <rect>
+      <x>620</x>
+      <y>560</y>
+      <width>150</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Executar RPA</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btn_relacionar_rubricas">
+    <property name="geometry">
+     <rect>
+      <x>420</x>
+      <y>560</y>
+      <width>150</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Relacionar Rubricas</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btn_relaciona_empresas_dominio">
+    <property name="geometry">
+     <rect>
+      <x>220</x>
+      <y>560</y>
+      <width>150</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Relacionar empresas Domínio</string>
+    </property>
+   </widget>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
