@@ -734,39 +734,19 @@ class eSocialXML():
         """
         # lê a planilha de relacionamento de eventos
         rubrics_relationship, generate_rubrics, ignore_rubrics = read_rubric_relationship(f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx')
+        handle_lauch_rubrics = self.handle_lauch_rubrics()
 
-        rubrics_importation = []
+        rubrics_importation = self.generate_rubricas_importation(generate_rubrics)
+        companies_rubrics = self.read_companies_rubrics(relacao_empresas, handle_lauch_rubrics)
         data_lancamentos_eventos = []
         data_lancto_medias = []
-        for rubric in generate_rubrics:
-
-            i_eventos = rubric.get('codigo')
-            descricao = rubric.get('descricao')
-            tipo = rubric.get('tipo')
-            natureza_tributaria_rubrica = rubric.get('natureza_tributaria_rubrica')
-            incidencia_inss = rubric.get('incidencia_inss_esocial')
-            incidencia_irrf = rubric.get('incidencia_irrf_esocial')
-            incidencia_fgts = rubric.get('incidencia_fgts_esocial')
-            incidencia_sindicato = rubric.get('incidencia_sindical_esocial')
-
-            table = Table('FOEVENTOS')
-            table.set_value('I_EVENTOS', i_eventos)
-            table.set_value('NOME', descricao)
-            table.set_value('PROV_DESC', tipo)
-            table.set_value('NATUREZA_FOLHA_MENSAL', natureza_tributaria_rubrica)
-            table.set_value('CODIGO_INCIDENCIA_INSS_ESOCIAL', incidencia_inss)
-            table.set_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL', incidencia_irrf)
-            table.set_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL', incidencia_fgts)
-            table.set_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL', incidencia_sindicato)
-
-            rubrics_importation.append(table.do_output())
 
         # coletar datas de pagamento
         payment_data = self.load_date_payment()
 
-        for s1200 in self.dicionario_s1200:
-            cnpj_empregador = self.dicionario_s1200[s1200].get('ideEmpregador').get('nrInsc')
-            cpf_empregado = self.dicionario_s1200[s1200].get('ideTrabalhador').get('cpfTrab')
+        for line in handle_lauch_rubrics:
+            cnpj_empregador = line.get('nrInsc')
+            cpf_empregado = line.get('cpfTrab')
 
             codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
@@ -774,9 +754,7 @@ class eSocialXML():
             if is_null(codi_emp) or is_null(i_empregados):
                 continue
 
-            infos_pagto = self.dicionario_s1200[s1200].get('dmDev')
-
-            complete_competence = self.dicionario_s1200[s1200].get('ideEvento').get('perApur')
+            complete_competence = line.get('perApur')
             if len(complete_competence) == 4:
                 # preenche o mês 12 e dia como 01
                 complete_competence += '-12-01'
@@ -786,77 +764,63 @@ class eSocialXML():
 
             competence = get_competence(complete_competence)
 
-            itens_to_handle = []
-            if isinstance(infos_pagto, list):
-                itens_to_handle.extend(infos_pagto)
-            else:
-                itens_to_handle.append(infos_pagto)
+            # Separa o primeiro prefixo do campo, pois ele indica o tipo da folha
+            dm_dev = str(line.get('ideDmDev')).split('_')[0]
 
-            for item in itens_to_handle:
-                dm_dev = str(item.get('ideDmDev')).split('_')[0]
-                infos_events = item.get('infoPerApur').get('ideEstabLot').get('remunPerApur').get('itensRemun')
+            # 11 é evento de folha mensal
+            # 41 é evento de adiantamento
+            # 51 é evento de adiantamento 13º
+            # 52 é evento de 13º integral
+            # 70 é evento de PLR
+            # 42 é evento de folha complementar
+            match dm_dev:
+                case 'FAD13':
+                    tipo_processo = '51'
+                case 'F13':
+                    tipo_processo = '52'
+                case 'FAD':
+                    tipo_processo = '41'
+                case _:
+                    tipo_processo = '11'
 
-                events_to_handle = []
-                if isinstance(infos_events, list):
-                    events_to_handle.extend(infos_events)
-                else:
-                    events_to_handle.append(infos_events)
+            i_eventos = line.get('codRubr')
+            valor_calculado = line.get('vrRubr')
 
-                # 11 é evento de folha mensal
-                # 41 é evento de adiantamento
-                # 51 é evento de adiantamento 13º
-                # 52 é evento de 13º integral
-                # 70 é evento de PLR
-                # 42 é evento de folha complementar
-                match dm_dev:
-                    case 'FAD13':
-                        tipo_processo = '51'
-                    case 'F13':
-                        tipo_processo = '52'
-                    case 'FAD':
-                        tipo_processo = '41'
-                    case _:
-                        tipo_processo = '11'
+            valor_informado = '1'
+            if line.get('fatorRubr') is not None:
+                valor_informado = line.get('fatorRubr')
 
-                for line in events_to_handle:
-                    i_eventos = line.get('codRubr')
-                    valor_calculado = line.get('vrRubr')
+            # se não encontrar a data de pagamento, vê o dia de pagamento da competência
+            # anterior ou posterior
+            data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, competence])
+            if is_null(data_pagto):
+                previus_competence = get_competence(add_month_to_date(complete_competence, -1, '%Y-%m-%d'))
+                next_competence = get_competence(add_month_to_date(complete_competence, 1, '%Y-%m-%d'))
 
-                    valor_informado = '1'
-                    if line.get('fatorRubr') is not None:
-                        valor_informado = line.get('fatorRubr')
+                if payment_data.exist([cnpj_empregador, cpf_empregado, previus_competence]):
+                    previus_data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, previus_competence])
+                    data_pagto = add_month_to_date(previus_data_pagto, 1, '%Y-%m-%d')
 
-                    # se não encontrar a data de pagamento, vê o dia de pagamento da competência
-                    # anterior ou posterior
-                    data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, competence])
-                    if is_null(data_pagto):
-                        previus_competence = get_competence(add_month_to_date(complete_competence, -1, '%Y-%m-%d'))
-                        next_competence = get_competence(add_month_to_date(complete_competence, 1, '%Y-%m-%d'))
+                if is_null(data_pagto):
+                    if payment_data.exist([cnpj_empregador, cpf_empregado, next_competence]):
+                        next_data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, next_competence])
+                        data_pagto = add_month_to_date(next_data_pagto, -1, '%Y-%m-%d')
 
-                        if payment_data.exist([cnpj_empregador, cpf_empregado, previus_competence]):
-                            previus_data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, previus_competence])
-                            data_pagto = add_month_to_date(previus_data_pagto, 1, '%Y-%m-%d')
+            if is_null(data_pagto):
+                continue
 
-                        if is_null(data_pagto):
-                            if payment_data.exist([cnpj_empregador, cpf_empregado, next_competence]):
-                                next_data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, next_competence])
-                                data_pagto = add_month_to_date(next_data_pagto, -1, '%Y-%m-%d')
+            table = Table('FOLANCAMENTOS_EVENTOS')
+            table.set_value('CODI_EMP', codi_emp)
+            table.set_value('I_EMPREGADOS', i_empregados)
+            table.set_value('TIPO_PROCESSO', tipo_processo)
+            table.set_value('COMPETENCIA_INICIAL', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
+            table.set_value('DATA_PAGAMENTO_ALTERA_CALCULO', transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y'))
+            table.set_value('I_EVENTOS', i_eventos)
+            table.set_value('VALOR_INFORMADO', valor_informado)
+            table.set_value('VALOR_CALCULADO', valor_calculado)
+            table.set_value('ORIGEM_REGISTRO', '3')
 
-                    if is_null(data_pagto):
-                        continue
-
-                    table = Table('FOLANCAMENTOS_EVENTOS')
-                    table.set_value('CODI_EMP', codi_emp)
-                    table.set_value('I_EMPREGADOS', i_empregados)
-                    table.set_value('TIPO_PROCESSO', tipo_processo)
-                    table.set_value('COMPETENCIA_INICIAL', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
-                    table.set_value('DATA_PAGAMENTO_ALTERA_CALCULO', transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y'))
-                    table.set_value('I_EVENTOS', i_eventos)
-                    table.set_value('VALOR_INFORMADO', valor_informado)
-                    table.set_value('VALOR_CALCULADO', valor_calculado)
-                    table.set_value('ORIGEM_REGISTRO', '3')
-
-                    data_lancamentos_eventos.append(table.do_output())
+            data_lancamentos_eventos.append(table.do_output())
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOEVENTOS.txt', rubrics_importation)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCAMENTOS_EVENTOS.txt', data_lancamentos_eventos)
@@ -1193,3 +1157,90 @@ class eSocialXML():
             payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
 
         return payment_data
+
+    def generate_rubricas_importation(self, generate_rubrics):
+        """
+        Alimenta o cadastro da rúbrica com os campos que vem do eSocial
+        """
+        rubrics_importation = []
+        for rubric in generate_rubrics:
+
+            i_eventos = rubric.get('codigo')
+            descricao = rubric.get('descricao')
+            tipo = rubric.get('tipo')
+            natureza_tributaria_rubrica = rubric.get('natureza_tributaria_rubrica')
+            incidencia_inss = rubric.get('incidencia_inss_esocial')
+            incidencia_irrf = rubric.get('incidencia_irrf_esocial')
+            incidencia_fgts = rubric.get('incidencia_fgts_esocial')
+            incidencia_sindicato = rubric.get('incidencia_sindical_esocial')
+
+            table = Table('FOEVENTOS')
+            table.set_value('I_EVENTOS', i_eventos)
+            table.set_value('NOME', descricao)
+            table.set_value('PROV_DESC', tipo)
+            table.set_value('NATUREZA_FOLHA_MENSAL', natureza_tributaria_rubrica)
+            table.set_value('CODIGO_INCIDENCIA_INSS_ESOCIAL', incidencia_inss)
+            table.set_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL', incidencia_irrf)
+            table.set_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL', incidencia_fgts)
+            table.set_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL', incidencia_sindicato)
+
+            rubrics_importation.append(table.do_output())
+
+        return rubrics_importation
+
+    def read_companies_rubrics(self, relacao_empresas, handle_lauch_rubrics):
+        """
+        Retorna um dicionário de quais empresas utilizam determinada rúbrica
+        """
+        companies_rubrics = {}
+
+        for line in handle_lauch_rubrics:
+            cnpj_empregador = line.get('nrInsc')
+            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
+            i_eventos = line.get('codRubr')
+
+            # adiciona a rubrica na lista de rubricas utilizadas pela empresa
+            if i_eventos not in companies_rubrics.keys():
+                companies_rubrics[i_eventos] = []
+
+            if int(codi_emp) not in companies_rubrics[i_eventos]:
+                companies_rubrics[i_eventos].append(int(codi_emp))
+
+        return companies_rubrics
+
+    def handle_lauch_rubrics(self):
+        """
+        Faz um tratamento inicial nos dados dos eventos S-1200 para deixá-los todos no mesmo padrão
+        """
+        new_data = []
+        for s1200 in self.dicionario_s1200:
+            infos_pagto = self.dicionario_s1200[s1200].get('dmDev')
+            itens_to_handle = []
+            if isinstance(infos_pagto, list):
+                itens_to_handle.extend(infos_pagto)
+            else:
+                itens_to_handle.append(infos_pagto)
+
+            for item in itens_to_handle:
+                dm_dev = item.get('ideDmDev')
+                infos_events = item.get('infoPerApur').get('ideEstabLot').get('remunPerApur').get('itensRemun')
+
+                events_to_handle = []
+                if isinstance(infos_events, list):
+                    events_to_handle.extend(infos_events)
+                else:
+                    events_to_handle.append(infos_events)
+
+                for line in events_to_handle:
+                    new_line = dict()
+                    new_line['nrInsc'] = self.dicionario_s1200[s1200].get('ideEmpregador').get('nrInsc')
+                    new_line['cpfTrab'] = self.dicionario_s1200[s1200].get('ideTrabalhador').get('cpfTrab')
+                    new_line['perApur'] = self.dicionario_s1200[s1200].get('ideEvento').get('perApur')
+                    new_line['ideDmDev'] = dm_dev
+                    new_line['codRubr'] = line.get('codRubr')
+                    new_line['fatorRubr'] = line.get('fatorRubr')
+                    new_line['vrRubr'] = line.get('vrRubr')
+
+                    new_data.append(new_line)
+
+        return new_data
