@@ -16,6 +16,8 @@ class eSocialXML():
         self.DIRETORIO_DOWNLOADS = f"{diretorio_xml}\\downloads"
         self.DIRETORIO_SAIDA = f"{diretorio_xml}\\saida"
         self.DIRETORIO_IMPORTAR = f"{diretorio_xml}\\importar"
+        self.INIT_COMPETENCE = '01/01/2022'
+        self.END_COMPETENCE = '01/01/2023'
 
         self.dicionario_rubricas_dominio = {} # Rubricas Domínio
         self.dicionario_s1010 = {} # Rubricas
@@ -738,6 +740,7 @@ class eSocialXML():
 
         rubrics_importation = self.generate_rubricas_importation(generate_rubrics)
         companies_rubrics = self.read_companies_rubrics(relacao_empresas, handle_lauch_rubrics)
+
         data_lancamentos_eventos = []
         data_lancto_medias = []
 
@@ -764,63 +767,80 @@ class eSocialXML():
 
             competence = get_competence(complete_competence)
 
-            # Separa o primeiro prefixo do campo, pois ele indica o tipo da folha
-            dm_dev = str(line.get('ideDmDev')).split('_')[0]
-
-            # 11 é evento de folha mensal
-            # 41 é evento de adiantamento
-            # 51 é evento de adiantamento 13º
-            # 52 é evento de 13º integral
-            # 70 é evento de PLR
-            # 42 é evento de folha complementar
-            match dm_dev:
-                case 'FAD13':
-                    tipo_processo = '51'
-                case 'F13':
-                    tipo_processo = '52'
-                case 'FAD':
-                    tipo_processo = '41'
-                case _:
-                    tipo_processo = '11'
-
             i_eventos = line.get('codRubr')
             valor_calculado = line.get('vrRubr')
 
-            valor_informado = '1'
-            if line.get('fatorRubr') is not None:
-                valor_informado = line.get('fatorRubr')
+            # Se estiver dentro da competência a ser calculada gera como lançamento
+            # senão lança como média
+            converted_init_competence = convert_date(self.INIT_COMPETENCE, '%d/%m/%Y')
+            converted_end_competence = convert_date(self.END_COMPETENCE, '%d/%m/%Y')
+            converted_competence = convert_date(complete_competence, '%Y-%m-%d')
+            if converted_init_competence <= converted_competence <= converted_end_competence:
 
-            # se não encontrar a data de pagamento, vê o dia de pagamento da competência
-            # anterior ou posterior
-            data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, competence])
-            if is_null(data_pagto):
-                previus_competence = get_competence(add_month_to_date(complete_competence, -1, '%Y-%m-%d'))
-                next_competence = get_competence(add_month_to_date(complete_competence, 1, '%Y-%m-%d'))
+                # Separa o primeiro prefixo do campo, pois ele indica o tipo da folha
+                dm_dev = str(line.get('ideDmDev')).split('_')[0]
 
-                if payment_data.exist([cnpj_empregador, cpf_empregado, previus_competence]):
-                    previus_data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, previus_competence])
-                    data_pagto = add_month_to_date(previus_data_pagto, 1, '%Y-%m-%d')
+                # 11 é evento de folha mensal
+                # 41 é evento de adiantamento
+                # 51 é evento de adiantamento 13º
+                # 52 é evento de 13º integral
+                # 70 é evento de PLR
+                # 42 é evento de folha complementar
+                match dm_dev:
+                    case 'FAD13':
+                        tipo_processo = '51'
+                    case 'F13':
+                        tipo_processo = '52'
+                    case 'FAD':
+                        tipo_processo = '41'
+                    case _:
+                        tipo_processo = '11'
+
+                valor_informado = '1'
+                if line.get('fatorRubr') is not None:
+                    valor_informado = line.get('fatorRubr')
+
+                # se não encontrar a data de pagamento, vê o dia de pagamento da competência
+                # anterior ou posterior
+                data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, competence])
+                if is_null(data_pagto):
+                    previus_competence = get_competence(add_month_to_date(complete_competence, -1, '%Y-%m-%d'))
+                    next_competence = get_competence(add_month_to_date(complete_competence, 1, '%Y-%m-%d'))
+
+                    if payment_data.exist([cnpj_empregador, cpf_empregado, previus_competence]):
+                        previus_data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, previus_competence])
+                        data_pagto = add_month_to_date(previus_data_pagto, 1, '%Y-%m-%d')
+
+                    if is_null(data_pagto):
+                        if payment_data.exist([cnpj_empregador, cpf_empregado, next_competence]):
+                            next_data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, next_competence])
+                            data_pagto = add_month_to_date(next_data_pagto, -1, '%Y-%m-%d')
 
                 if is_null(data_pagto):
-                    if payment_data.exist([cnpj_empregador, cpf_empregado, next_competence]):
-                        next_data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, next_competence])
-                        data_pagto = add_month_to_date(next_data_pagto, -1, '%Y-%m-%d')
+                    continue
 
-            if is_null(data_pagto):
-                continue
+                table = Table('FOLANCAMENTOS_EVENTOS')
+                table.set_value('CODI_EMP', codi_emp)
+                table.set_value('I_EMPREGADOS', i_empregados)
+                table.set_value('TIPO_PROCESSO', tipo_processo)
+                table.set_value('COMPETENCIA_INICIAL', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
+                table.set_value('DATA_PAGAMENTO_ALTERA_CALCULO', transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y'))
+                table.set_value('I_EVENTOS', i_eventos)
+                table.set_value('VALOR_INFORMADO', valor_informado)
+                table.set_value('VALOR_CALCULADO', valor_calculado)
+                table.set_value('ORIGEM_REGISTRO', '3')
 
-            table = Table('FOLANCAMENTOS_EVENTOS')
-            table.set_value('CODI_EMP', codi_emp)
-            table.set_value('I_EMPREGADOS', i_empregados)
-            table.set_value('TIPO_PROCESSO', tipo_processo)
-            table.set_value('COMPETENCIA_INICIAL', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
-            table.set_value('DATA_PAGAMENTO_ALTERA_CALCULO', transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y'))
-            table.set_value('I_EVENTOS', i_eventos)
-            table.set_value('VALOR_INFORMADO', valor_informado)
-            table.set_value('VALOR_CALCULADO', valor_calculado)
-            table.set_value('ORIGEM_REGISTRO', '3')
+                data_lancamentos_eventos.append(table.do_output())
+            else:
+                # eventos que entrarão para médias
+                table = Table('FOLANCTOMEDIAS')
+                table.set_value('CODI_EMP', codi_emp)
+                table.set_value('I_EMPREGADOS', i_empregados)
+                table.set_value('COMPETENCIA', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
+                table.set_value('I_EVENTOS', i_eventos)
+                table.set_value('VALOR', valor_calculado)
 
-            data_lancamentos_eventos.append(table.do_output())
+                data_lancto_medias.append(table.do_output())
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOEVENTOS.txt', rubrics_importation)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCAMENTOS_EVENTOS.txt', data_lancamentos_eventos)
