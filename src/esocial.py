@@ -767,7 +767,6 @@ class eSocialXML():
         for s1200 in self.dicionario_s1200:
             cnpj_empregador = self.dicionario_s1200[s1200].get('ideEmpregador').get('nrInsc')
             cpf_empregado = self.dicionario_s1200[s1200].get('ideTrabalhador').get('cpfTrab')
-            indicativo_apuracao = self.dicionario_s1200[s1200].get('ideEvento').get('indApuracao')
 
             codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
@@ -778,7 +777,6 @@ class eSocialXML():
             infos_pagto = self.dicionario_s1200[s1200].get('dmDev')
 
             complete_competence = self.dicionario_s1200[s1200].get('ideEvento').get('perApur')
-            original_competence = self.dicionario_s1200[s1200].get('ideEvento').get('perApur')
             if len(complete_competence) == 4:
                 # preenche o mês 12 e dia como 01
                 complete_competence += '-12-01'
@@ -795,6 +793,7 @@ class eSocialXML():
                 itens_to_handle.append(infos_pagto)
 
             for item in itens_to_handle:
+                dm_dev = str(item.get('ideDmDev')).split('_')[0]
                 infos_events = item.get('infoPerApur').get('ideEstabLot').get('remunPerApur').get('itensRemun')
 
                 events_to_handle = []
@@ -809,11 +808,15 @@ class eSocialXML():
                 # 52 é evento de 13º integral
                 # 70 é evento de PLR
                 # 42 é evento de folha complementar
-                tipo_processo = '11'
-
-                # Se for indicativo 2, é referente a 13º salário integral
-                if indicativo_apuracao == '2':
-                    tipo_processo = '52'
+                match dm_dev:
+                    case 'FAD13':
+                        tipo_processo = '51'
+                    case 'F13':
+                        tipo_processo = '52'
+                    case 'FAD':
+                        tipo_processo = '41'
+                    case _:
+                        tipo_processo = '11'
 
                 for line in events_to_handle:
                     i_eventos = line.get('codRubr')
