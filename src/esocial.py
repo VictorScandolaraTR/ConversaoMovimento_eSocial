@@ -872,21 +872,56 @@ class eSocialXML():
         """
         Salvar dados de rescisão e férias que o RPA irá calcular
         """
+        # apagar dados já salvos
+        table = DominioRescisao()
+        table.connect(self.BANCO_SQLITE)
+        table.delete().execute()
+
+        # Carregar dados de aviso prévio
+        data_rescission = StorageData()
+        for s2299 in self.dicionario_s2299:
+            cnpj_empregador = self.dicionario_s2299[s2299].get("ideEmpregador").get("nrInsc")
+            cpf_empregado = self.dicionario_s2299[s2299].get("ideVinculo").get("cpfTrab")
+
+            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
+            i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+
+            infos = self.dicionario_s2299[s2299].get('infoDeslig')
+            aviso_previo = infos.get('indPagtoAPI')
+            data_fim_aviso = infos.get('dtProjFimAPI')
+
+            data_rescission.add(aviso_previo, [codi_emp, i_empregados, 'AVISO_PREVIO'])
+            data_rescission.add(data_fim_aviso, [codi_emp, i_empregados, 'DATA_FIM_AVISO'])
+
         data = Table('FOAFASTAMENTOS_IMPORTACAO', file=f'{self.DIRETORIO_IMPORTAR}\\FOAFASTAMENTOS_IMPORTACAO.txt')
         for line in data.items():
             if format_int(line.get_value('I_AFASTAMENTOS')) == 8:
+                codi_emp = line.get_value('CODI_EMP')
+                i_empregados = line.get_value('I_EMPREGADOS')
 
                 new_line = DominioRescisao()
                 new_line.connect(self.BANCO_SQLITE)
 
-                new_line.codi_emp = line.get_value('CODI_EMP')
-                new_line.i_empregados = line.get_value('I_EMPREGADOS')
+                aviso_previo = data_rescission.get([codi_emp, i_empregados, 'AVISO_PREVIO'])
+
+                new_line.codi_emp = codi_emp
+                new_line.i_empregados = i_empregados
                 new_line.competencia = replace_day_date(line.get_value('DATA_REAL'), '%d/%m/%Y', 1)
                 new_line.data_demissao = line.get_value('DATA_REAL')
-                new_line.aviso_previo = ''
-                new_line.data_aviso = ''
-                new_line.dias_projecao_aviso = ''
                 new_line.data_pagamento = ''
+
+                if aviso_previo == 'S':
+                    data_fim_aviso = data_rescission.get([codi_emp, i_empregados, 'DATA_FIM_AVISO'])
+                    formated_data_fim_aviso = transform_date(data_fim_aviso, '%Y-%m-%d', '%d/%m/%Y')
+                    dias_projecao_aviso = difference_between_dates(line.get_value('DATA_REAL'), formated_data_fim_aviso, '%d/%m/%Y')
+
+                    new_line.aviso_previo = True
+                    new_line.data_aviso = formated_data_fim_aviso
+                    new_line.dias_projecao_aviso = dias_projecao_aviso+1
+                else:
+                    new_line.aviso_previo = False
+                    new_line.data_aviso = ''
+                    new_line.dias_projecao_aviso = ''
 
                 new_line.save()
 

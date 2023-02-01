@@ -4,14 +4,15 @@ db = peewee.SqliteDatabase(None)
 
 
 class DominioRescisao(peewee.Model):
-    codi_emp = peewee.CharField(max_length=4, null=True)
-    i_empregados = peewee.CharField(max_length=8, null=True)
-    competencia = peewee.CharField(max_length=10, null=True)
-    data_demissao = peewee.CharField(max_length=10, null=True)
-    aviso_previo = peewee.CharField(max_length=1, null=True)
-    data_aviso = peewee.CharField(max_length=10, null=True)
-    dias_projecao_aviso = peewee.CharField(max_length=2, null=True)
-    data_pagamento = peewee.CharField(max_length=10, null=True)
+    codi_emp = peewee.IntegerField(null=True)
+    i_empregados = peewee.IntegerField(null=True)
+    competencia = peewee.DateField(null=True)
+    data_demissao = peewee.DateField(null=True)
+    motivo = peewee.CharField(max_length=1, null=True)
+    data_pagamento = peewee.DateField(null=True)
+    aviso_previo = peewee.BooleanField(null=True)
+    data_aviso = peewee.DateField(null=True)
+    dias_projecao_aviso = peewee.FloatField(null=True)
 
     class Meta:
         database = db
