@@ -890,9 +890,22 @@ class eSocialXML():
             infos = self.dicionario_s2299[s2299].get('infoDeslig')
             aviso_previo = infos.get('indPagtoAPI')
             data_fim_aviso = infos.get('dtProjFimAPI')
+            motivo_desligamento = infos.get('mtvDeslig')
 
             data_rescission.add(aviso_previo, [codi_emp, i_empregados, 'AVISO_PREVIO'])
             data_rescission.add(data_fim_aviso, [codi_emp, i_empregados, 'DATA_FIM_AVISO'])
+            data_rescission.add(motivo_desligamento, [codi_emp, i_empregados, 'MOTIVO_DESLIGAMENTO'])
+            data_rescission.add('empregado', [codi_emp, i_empregados, 'TIPO'])
+
+        # Carregar contribuintes
+        for s2399 in self.dicionario_s2399:
+            cnpj_empregador = self.dicionario_s2399[s2399].get("ideEmpregador").get("nrInsc")
+            cpf_empregado = self.dicionario_s2399[s2399].get("ideTrabSemVinculo").get("cpfTrab")
+
+            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
+            i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+
+            data_rescission.add('contribuinte', [codi_emp, i_empregados, 'TIPO'])
 
         data = Table('FOAFASTAMENTOS_IMPORTACAO', file=f'{self.DIRETORIO_IMPORTAR}\\FOAFASTAMENTOS_IMPORTACAO.txt')
         for line in data.items():
@@ -904,12 +917,19 @@ class eSocialXML():
                 new_line.connect(self.BANCO_SQLITE)
 
                 aviso_previo = data_rescission.get([codi_emp, i_empregados, 'AVISO_PREVIO'])
+                tipo = data_rescission.get([codi_emp, i_empregados, 'TIPO'])
+
+                if tipo == 'empregado':
+                    motivo_desligamento = data_rescission.get([codi_emp, i_empregados, 'MOTIVO_DESLIGAMENTO'])
+                else:
+                    # contribuintes vão por padrão no Domínio com motivo 99 - Outros
+                    motivo_desligamento = '99'
 
                 new_line.codi_emp = codi_emp
                 new_line.i_empregados = i_empregados
                 new_line.competencia = replace_day_date(line.get_value('DATA_REAL'), '%d/%m/%Y', 1)
                 new_line.data_demissao = line.get_value('DATA_REAL')
-                new_line.motivo = ''
+                new_line.motivo = motivos_desligamento_esocial.get(motivo_desligamento)
                 new_line.data_pagamento = ''
 
                 if aviso_previo == 'S':
@@ -918,14 +938,15 @@ class eSocialXML():
                     dias_projecao_aviso = difference_between_dates(line.get_value('DATA_REAL'), formated_data_fim_aviso, '%d/%m/%Y')
 
                     new_line.aviso_previo = True
-                    new_line.data_aviso = formated_data_fim_aviso
+                    new_line.data_aviso = line.get_value('DATA_REAL')
                     new_line.dias_projecao_aviso = dias_projecao_aviso+1
                 else:
                     new_line.aviso_previo = False
                     new_line.data_aviso = ''
                     new_line.dias_projecao_aviso = ''
 
-                new_line.save()
+                if not is_null(new_line.motivo):
+                    new_line.save()
 
     def gerar_afastamentos_importacao(self, relacao_empresas, relacao_empregados):
         """
