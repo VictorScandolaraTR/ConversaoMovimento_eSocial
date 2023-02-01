@@ -11,6 +11,7 @@ from src.database.Sybase import Sybase
 from src.database.SQLite_tables import *
 from src.utils.functions import *
 from src.database.data_rubrics import *
+from src.database.depara import *
 
 class eSocialXML():
     def __init__(self, diretorio_xml):
@@ -908,6 +909,7 @@ class eSocialXML():
                 new_line.i_empregados = i_empregados
                 new_line.competencia = replace_day_date(line.get_value('DATA_REAL'), '%d/%m/%Y', 1)
                 new_line.data_demissao = line.get_value('DATA_REAL')
+                new_line.motivo = ''
                 new_line.data_pagamento = ''
 
                 if aviso_previo == 'S':
@@ -1013,11 +1015,9 @@ class eSocialXML():
                         data_fim = infos_afastamento.get('fimAfastamento').get('dtTermAfast')
 
                     cod_motivo_esocial = infos_afastamento.get('iniAfastamento').get('codMotAfast')
-                    motivos_esocial = get_keys('motivos_afastamentos_esocial')
+                    motivo = motivos_afastamentos_esocial.get(cod_motivo_esocial)
 
-                    if cod_motivo_esocial in motivos_esocial:
-                        motivo = motivos_esocial.get(cod_motivo_esocial)
-                    else:
+                    if is_null(motivo):
                         continue
 
                     # afastamento por doença ou acidente de trabalho tem o mesmo código no eSocial

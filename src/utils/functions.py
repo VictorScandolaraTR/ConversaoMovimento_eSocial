@@ -211,23 +211,6 @@ def add_month_to_date(str_date, months, date_format, default_value_error='NULO')
         return default_value_error
 
 
-def get_keys(key):
-    """
-    Retorna valores do arquivo depara.json
-    """
-    with open('.\\src\\database\\depara.json') as file:
-        dicionario = json.load(file)
-
-    if str(key).upper() in dicionario.keys():
-        return dicionario[str(key).upper()]
-    elif str(key).lower() in dicionario.keys():
-        return dicionario[str(key).lower()]
-    elif str(key).capitalize() in dicionario.keys():
-        return dicionario[str(key).capitalize()]
-    else:
-        return False
-
-
 def get_current_day():
     """
     Retorna a data atual

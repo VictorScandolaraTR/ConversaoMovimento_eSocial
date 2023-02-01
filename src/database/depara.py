@@ -1,5 +1,4 @@
-{
-  "motivos_afastamentos_esocial": {
+motivos_afastamentos_esocial = {
     "10": "02",
     "11": "35",
     "12": "24",
@@ -30,5 +29,4 @@
     "06": "14",
     "08": "08",
     "07": "39"
-  }
 }
