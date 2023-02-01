@@ -142,6 +142,8 @@ class Sybase:
         for row in rows:
             rubrics_medias.append(str(row[0]))
 
+        return rubrics_medias
+
     def select_companies_to_use_rubrics(self, connection):
         """
         Seleciona de qual empresa a empresa usa rubricas

@@ -736,13 +736,19 @@ class eSocialXML():
         """
         Gravar os arquivos de eventos, lançamentos e médias para importação
         """
+        sybase = Sybase(self.base_dominio, self.usuario_dominio, self.senha_dominio)
+        connection = sybase.connect()
+
+        # rubricas que entram para médias
+        rubrics_averages = sybase.select_rubrics_averages(connection, self.empresa_padrao_rubricas)
+
         rubrics_relationship = StorageData()
         general_rubrics_relationship, generate_rubrics, ignore_rubrics = read_rubric_relationship(f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx')
         handle_lauch_rubrics = self.handle_lauch_rubrics()
 
         rubrics_esocial = self.generate_rubricas_esocial(generate_rubrics)
         companies_rubrics = self.read_companies_rubrics(relacao_empresas, handle_lauch_rubrics)
-        rubrics_importation, rubrics_base_calc_importation, rubrics_formula = self.complete_data_rubrics(rubrics_esocial, companies_rubrics, rubrics_relationship)
+        rubrics_importation, rubrics_base_calc_importation, rubrics_formula = self.complete_data_rubrics(rubrics_esocial, companies_rubrics, rubrics_relationship, rubrics_averages)
 
         data_lancamentos_eventos = []
         data_lancto_medias = []
@@ -839,14 +845,15 @@ class eSocialXML():
                 data_lancamentos_eventos.append(table.do_output())
             else:
                 # eventos que entrarão para médias
-                table = Table('FOLANCTOMEDIAS')
-                table.set_value('CODI_EMP', codi_emp)
-                table.set_value('I_EMPREGADOS', i_empregados)
-                table.set_value('COMPETENCIA', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
-                table.set_value('I_EVENTOS', i_eventos)
-                table.set_value('VALOR', valor_calculado)
+                if str(i_eventos) in rubrics_averages:
+                    table = Table('FOLANCTOMEDIAS')
+                    table.set_value('CODI_EMP', codi_emp)
+                    table.set_value('I_EMPREGADOS', i_empregados)
+                    table.set_value('COMPETENCIA', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
+                    table.set_value('I_EVENTOS', i_eventos)
+                    table.set_value('VALOR', valor_calculado)
 
-                data_lancto_medias.append(table.do_output())
+                    data_lancto_medias.append(table.do_output())
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOEVENTOS.txt', rubrics_importation)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOEVENTOSBASES.txt', rubrics_base_calc_importation)
@@ -1273,7 +1280,7 @@ class eSocialXML():
 
         return new_data
 
-    def complete_data_rubrics(self, rubrics_esocial, companies_rubrics, rubrics_relationship):
+    def complete_data_rubrics(self, rubrics_esocial, companies_rubrics, rubrics_relationship, rubrics_averages):
         """
         Complementa a tabela de rúbricas com alguma equivalente do contábil, e gera também as bases de cálculo
         e fórmulas necessárias
@@ -1292,7 +1299,6 @@ class eSocialXML():
         connection = sybase.connect()
 
         data_rubrics, data_base_calc_rubrics, data_formula_rubrics = sybase.select_data_rubrics(connection, self.empresa_padrao_rubricas)
-        rubrics_averages = sybase.select_rubrics_averages(connection, self.empresa_padrao_rubricas)
         uses_company_rubrics = sybase.select_companies_to_use_rubrics(connection)
         dominio_rubrics = sybase.select_rubrics(connection)
         dominio_rubrics_esocial = sybase.select_codigo_esocial_rubrics(connection)
