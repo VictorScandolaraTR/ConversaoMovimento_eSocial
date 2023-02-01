@@ -1,8 +1,0 @@
-xmltodict
-pyodbc
-pandas
-Levenshtein
-tqdm
-python-dateutil
-sqlalchemy
-sqlalchemy-sybase
