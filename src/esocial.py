@@ -794,7 +794,7 @@ class eSocialXML():
             if converted_init_competence <= converted_competence <= converted_end_competence:
 
                 # Separa o primeiro prefixo do campo, pois ele indica o tipo da folha
-                dm_dev = str(line.get('ideDmDev')).split('_')[0]
+                dm_dev = str(line.get('ideDmDev')).replace('RESC', '').split('_')[0]
 
                 # 11 é evento de folha mensal
                 # 41 é evento de adiantamento
