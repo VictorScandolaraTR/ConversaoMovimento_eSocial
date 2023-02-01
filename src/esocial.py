@@ -739,8 +739,8 @@ class eSocialXML():
         sybase = Sybase(self.base_dominio, self.usuario_dominio, self.senha_dominio)
         connection = sybase.connect()
 
-        # rubricas que entram para médias
         rubrics_averages = sybase.select_rubrics_averages(connection, self.empresa_padrao_rubricas)
+        uses_company_rubrics = sybase.select_companies_to_use_rubrics(connection)
 
         rubrics_relationship = StorageData()
         general_rubrics_relationship, generate_rubrics, ignore_rubrics = read_rubric_relationship(f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx')
@@ -754,7 +754,7 @@ class eSocialXML():
         data_lancto_medias = []
 
         # Completa o de/para de rúbricas de cada empresa, com os relacionamentos feitos na planilha
-        load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_rubrics_relationship)
+        load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_rubrics_relationship, uses_company_rubrics)
 
         # coletar datas de pagamento
         payment_data = self.load_date_payment()
@@ -779,7 +779,8 @@ class eSocialXML():
 
             competence = get_competence(complete_competence)
 
-            i_eventos = rubrics_relationship.get([codi_emp, str(line.get('codRubr'))])
+            codi_emp_eve = uses_company_rubrics.get(int(codi_emp))
+            i_eventos = rubrics_relationship.get([str(codi_emp_eve), str(line.get('codRubr'))])
             valor_calculado = line.get('vrRubr')
 
             # Se estiver dentro da competência a ser calculada gera como lançamento
@@ -1700,8 +1701,10 @@ def generate_default_base(codi_emp, i_eventos, i_cadbases):
     return table_calc.do_output()
 
 
-def load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_rubrics_relationship):
+def load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_rubrics_relationship, uses_company_rubrics):
     for i_eventos in companies_rubrics:
         for codi_emp in companies_rubrics.get(i_eventos):
+            codi_emp_eve = uses_company_rubrics.get(codi_emp)
+
             i_eventos_importation = general_rubrics_relationship.get(i_eventos)
-            rubrics_relationship.add(i_eventos_importation, [str(codi_emp), str(i_eventos)])
+            rubrics_relationship.add(i_eventos_importation, [str(codi_emp_eve), str(i_eventos)])
