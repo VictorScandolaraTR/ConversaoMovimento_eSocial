@@ -955,6 +955,7 @@ class eSocialXML():
         data_foafastamentos_importacao = []
         data_afastamentos_xml_incompleto = StorageData()
         data_afastamentos_xml = StorageData()
+        check_demissao = StorageData()
 
         # Podem vir afastamentos onde a data de início está em um XML e a
         # data fim em outro, dessa forma precisamos organizar os dados e encontrar
@@ -1075,13 +1076,15 @@ class eSocialXML():
 
             data_desligamento = self.dicionario_s2299[s2299].get("infoDeslig").get("dtDeslig")
             data_real_demissao = add_day_to_date(data_desligamento, '%Y-%m-%d', 1)
-            table = Table('FOAFASTAMENTOS_IMPORTACAO')
+            if not check_demissao.exist([codi_emp, i_empregados]):
+                table = Table('FOAFASTAMENTOS_IMPORTACAO')
 
-            table.set_value('CODI_EMP', codi_emp)
-            table.set_value('I_EMPREGADOS', i_empregados)
-            table.set_value('I_AFASTAMENTOS', 8)
-            table.set_value('DATA_REAL', data_real_demissao)
-            data_foafastamentos_importacao.append(table.do_output())
+                table.set_value('CODI_EMP', codi_emp)
+                table.set_value('I_EMPREGADOS', i_empregados)
+                table.set_value('I_AFASTAMENTOS', 8)
+                table.set_value('DATA_REAL', data_real_demissao)
+                data_foafastamentos_importacao.append(table.do_output())
+                check_demissao.add('True', [codi_emp, i_empregados])
 
         # demissões contribuintes
         for s2399 in self.dicionario_s2399:
@@ -1095,13 +1098,16 @@ class eSocialXML():
                 continue
 
             data_demissao = self.dicionario_s2399[s2399].get("infoTSVTermino").get("dtTerm")
-            table = Table('FOAFASTAMENTOS_IMPORTACAO')
 
-            table.set_value('CODI_EMP', codi_emp)
-            table.set_value('I_EMPREGADOS', i_empregados)
-            table.set_value('I_AFASTAMENTOS', 8)
-            table.set_value('DATA_REAL', transform_date(data_demissao, '%Y-%m-%d', '%d/%m/%Y'))
-            data_foafastamentos_importacao.append(table.do_output())
+            if not check_demissao.exist([codi_emp, i_empregados]):
+                table = Table('FOAFASTAMENTOS_IMPORTACAO')
+
+                table.set_value('CODI_EMP', codi_emp)
+                table.set_value('I_EMPREGADOS', i_empregados)
+                table.set_value('I_AFASTAMENTOS', 8)
+                table.set_value('DATA_REAL', transform_date(data_demissao, '%Y-%m-%d', '%d/%m/%Y'))
+                data_foafastamentos_importacao.append(table.do_output())
+                check_demissao.add('True', [codi_emp, i_empregados])
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOAFASTAMENTOS_IMPORTACAO.txt', data_foafastamentos_importacao)
 
