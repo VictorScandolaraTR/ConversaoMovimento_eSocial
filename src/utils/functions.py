@@ -171,6 +171,20 @@ def is_null(field, check_int=False, date=False):
     return result
 
 
+def replace_day_date(str_date, date_format, day, default_value_error='NULO'):
+    """
+    Troca o dia de uma data para outro
+    """
+    try:
+        new_date = default_value_error
+        if not is_null(str_date):
+            date = convert_date(str_date, date_format)
+            new_date = (date.replace(day=day)).strftime("%d/%m/%Y")
+
+        return new_date
+    except:
+        return default_value_error
+
 def add_day_to_date(str_date, date_format, days, default_value_error='NULO'):
     """
     Adiciona dias(int) a uma string de data e retorna uma string no formato DD/MM/YYYY
@@ -184,7 +198,6 @@ def add_day_to_date(str_date, date_format, days, default_value_error='NULO'):
         return new_date
     except:
         return default_value_error
-
 
 def add_month_to_date(str_date, months, date_format, default_value_error='NULO'):
     """

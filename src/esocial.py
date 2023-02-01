@@ -19,6 +19,7 @@ class eSocialXML():
         self.DIRETORIO_DOWNLOADS = f"{diretorio_xml}\\downloads"
         self.DIRETORIO_SAIDA = f"{diretorio_xml}\\saida"
         self.DIRETORIO_IMPORTAR = f"{diretorio_xml}\\importar"
+        self.BANCO_SQLITE = f"{diretorio_xml}\\temp.db"
         self.INIT_COMPETENCE = '01/01/2022'
         self.END_COMPETENCE = '01/01/2023'
 
@@ -746,6 +747,7 @@ class eSocialXML():
         rubrics_relationship = StorageData()
         general_rubrics_relationship, generate_rubrics, ignore_rubrics = read_rubric_relationship(f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx')
         handle_lauch_rubrics = self.handle_lauch_rubrics()
+        self.read_rescission_rubrics(handle_lauch_rubrics)
 
         rubrics_esocial = self.generate_rubricas_esocial(generate_rubrics)
         companies_rubrics = self.read_companies_rubrics(relacao_empresas, handle_lauch_rubrics)
@@ -833,6 +835,9 @@ class eSocialXML():
                 if is_null(data_pagto):
                     continue
 
+                if is_null(i_eventos):
+                    continue
+
                 table = Table('FOLANCAMENTOS_EVENTOS')
                 table.set_value('CODI_EMP', codi_emp)
                 table.set_value('I_EMPREGADOS', i_empregados)
@@ -869,7 +874,21 @@ class eSocialXML():
         """
         data = Table('FOAFASTAMENTOS_IMPORTACAO', file=f'{self.DIRETORIO_IMPORTAR}\\FOAFASTAMENTOS_IMPORTACAO.txt')
         for line in data.items():
-            print(line.do_output())
+            if format_int(line.get_value('I_AFASTAMENTOS')) == 8:
+
+                new_line = DominioRescisao()
+                new_line.connect(self.BANCO_SQLITE)
+
+                new_line.codi_emp = line.get_value('CODI_EMP')
+                new_line.i_empregados = line.get_value('I_EMPREGADOS')
+                new_line.competencia = replace_day_date(line.get_value('DATA_REAL'), '%d/%m/%Y', 1)
+                new_line.data_demissao = line.get_value('DATA_REAL')
+                new_line.aviso_previo = ''
+                new_line.data_aviso = ''
+                new_line.dias_projecao_aviso = ''
+                new_line.data_pagamento = ''
+
+                new_line.save()
 
     def gerar_afastamentos_importacao(self, relacao_empresas, relacao_empregados):
         """
@@ -1289,6 +1308,45 @@ class eSocialXML():
                     new_data.append(new_line)
 
         return new_data
+
+    def read_rescission_rubrics(self, handle_lauch_rubrics):
+        """
+        Em alguns eventos S-2299 vem informadas algumas verbas rescisórias, então juntamos essas verbas
+        na lista de lançamentos que precisam ser feitos
+        """
+        for s2299 in self.dicionario_s2299:
+            infos_pagto = self.dicionario_s2299[s2299].get('infoDeslig').get('verbasResc')
+
+            if infos_pagto is not None:
+
+                items_to_handle = []
+                if isinstance(infos_pagto.get('dmDev'), list):
+                    items_to_handle.extend(infos_pagto.get('dmDev'))
+                else:
+                    items_to_handle.append(infos_pagto.get('dmDev'))
+
+                for item in items_to_handle:
+                    dm_dev = item.get('ideDmDev')
+
+                    infos_events = item.get('infoPerApur').get('ideEstabLot').get('detVerbas')
+
+                    events_to_handle = []
+                    if isinstance(infos_events, list):
+                        events_to_handle.extend(infos_events)
+                    else:
+                        events_to_handle.append(infos_events)
+
+                    for line in events_to_handle:
+                        new_line = dict()
+                        new_line['nrInsc'] = self.dicionario_s2299[s2299].get('ideEmpregador').get('nrInsc')
+                        new_line['cpfTrab'] = self.dicionario_s2299[s2299].get('ideVinculo').get('cpfTrab')
+                        new_line['perApur'] = get_competence(self.dicionario_s2299[s2299].get('infoDeslig').get('dtDeslig'))
+                        new_line['ideDmDev'] = dm_dev
+                        new_line['codRubr'] = line.get('codRubr')
+                        new_line['fatorRubr'] = line.get('qtdRubr')
+                        new_line['vrRubr'] = line.get('vrRubr')
+
+                        handle_lauch_rubrics.append(new_line)
 
     def complete_data_rubrics(self, rubrics_esocial, companies_rubrics, rubrics_relationship, rubrics_averages):
         """
