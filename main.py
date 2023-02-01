@@ -13,8 +13,9 @@ esocial.gera_excel_relacao(relacao_empresas)
 esocial.gerar_afastamentos_importacao(relacao_empresas, relacao_empregados)
 esocial.gerar_ferias_importacao(relacao_empresas, relacao_empregados)
 
-esocial.gerar_arquivos_saida(relacao_empresas, relacao_empregados)
-esocial.save_rescission_and_vacation(relacao_empresas, relacao_empregados)
+data_vacation = esocial.gerar_arquivos_saida(relacao_empresas, relacao_empregados)
+esocial.save_rescission(relacao_empresas, relacao_empregados)
+esocial.save_vacation(data_vacation)
 
 '''f = open("s1010.json","w")
 f.write(json.dumps(esocial.processar_rubricas()))

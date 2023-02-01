@@ -737,7 +737,10 @@ class eSocialXML():
 
     def gerar_arquivos_saida(self, relacao_empresas, relacao_empregados):
         """
-        Gravar os arquivos de eventos, lançamentos e médias para importação
+        Gravar os arquivos de eventos, lançamentos e médias para importação.
+
+        Retorna as rubricas que são de férias e que devem ser lançadas no cálculo
+        de férias também.
         """
         sybase = Sybase(self.base_dominio, self.usuario_dominio, self.senha_dominio)
         connection = sybase.connect()
@@ -746,6 +749,7 @@ class eSocialXML():
         uses_company_rubrics = sybase.select_companies_to_use_rubrics(connection)
 
         rubrics_relationship = StorageData()
+        data_vacation = StorageData()
         general_rubrics_relationship, generate_rubrics, ignore_rubrics = read_rubric_relationship(f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx')
         handle_lauch_rubrics = self.handle_lauch_rubrics()
         self.read_rescission_rubrics(handle_lauch_rubrics)
@@ -787,6 +791,10 @@ class eSocialXML():
             i_eventos = rubrics_relationship.get([str(codi_emp_eve), str(line.get('codRubr'))])
             valor_calculado = line.get('vrRubr')
 
+            valor_informado = '1'
+            if line.get('fatorRubr') is not None:
+                valor_informado = line.get('fatorRubr')
+
             # Se estiver dentro da competência a ser calculada gera como lançamento
             # senão lança como média
             converted_init_competence = convert_date(self.INIT_COMPETENCE, '%d/%m/%Y')
@@ -810,12 +818,16 @@ class eSocialXML():
                         tipo_processo = '52'
                     case 'FAD':
                         tipo_processo = '41'
-                    case _:
+                    case 'FER':
                         tipo_processo = '11'
 
-                valor_informado = '1'
-                if line.get('fatorRubr') is not None:
-                    valor_informado = line.get('fatorRubr')
+                        # Para eventos de férias, precisamos guardar eles para serem
+                        # lançados também ao calcular as férias do empregado
+                        new_format_competence = transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y')
+                        data_vacation.add(valor_informado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_INFORMADO'])
+                        data_vacation.add(valor_calculado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_CALCULADO'])
+                    case _:
+                        tipo_processo = '11'
 
                 # se não encontrar a data de pagamento, vê o dia de pagamento da competência
                 # anterior ou posterior
@@ -868,10 +880,11 @@ class eSocialXML():
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFORMULAS.txt', rubrics_formula)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCAMENTOS_EVENTOS.txt', data_lancamentos_eventos)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCTO_MEDIAS.txt', data_lancto_medias)
+        return data_vacation
 
-    def save_rescission_and_vacation(self, relacao_empresas, relacao_empregados):
+    def save_rescission(self, relacao_empresas, relacao_empregados):
         """
-        Salvar dados de rescisão e férias que o RPA irá calcular
+        Salvar dados de rescisão que o RPA irá calcular
         """
         # apagar dados já salvos
         table = DominioRescisao()
@@ -946,6 +959,52 @@ class eSocialXML():
                     new_line.dias_projecao_aviso = ''
 
                 if not is_null(new_line.motivo):
+                    new_line.save()
+
+    def save_vacation(self, data_vacation):
+        """
+        Salvar dados de férias que o RPA irá calcular
+        """
+        # apagar dados já salvos
+        table = DominioFerias()
+        table.connect(self.BANCO_SQLITE)
+        table.delete().execute()
+
+        data = Table('FOFERIAS_GOZO', file=f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_GOZO.txt')
+        for line in data.items():
+            codi_emp = str(line.get_value('CODI_EMP'))
+            i_empregados = str(line.get_value('I_EMPREGADOS'))
+            competencia = replace_day_date(line.get_value('GOZO_INICIO'), '%d/%m/%Y', 1)
+
+            # Se não encontra nenhum lançamento na competência atual, diminui dois
+            # dias(prazo que as férias devem ser pagas) e tenta pesquisar novamente,
+            # pois o pagamento pode ter sido feito na competência anterior
+            data_rubric = data_vacation.get([codi_emp, i_empregados, competencia])
+            if not data_rubric:
+                data_pagto = add_day_to_date(line.get_value('GOZO_INICIO'), '%d/%m/%Y', -2)
+                previus_competence = replace_day_date(data_pagto, '%d/%m/%Y', 1)
+                data_rubric = data_vacation.get([codi_emp, i_empregados, previus_competence])
+
+            for rubric in data_rubric:
+                new_line = DominioFerias()
+                new_line.connect(self.BANCO_SQLITE)
+
+                new_line.codi_emp = codi_emp
+                new_line.i_empregados = i_empregados
+                new_line.competencia = competencia
+                new_line.inicio_aquisitivo = line.get_value('INICIO_AQUISITIVO')
+                new_line.fim_aquisitivo = line.get_value('FIM_AQUISITIVO')
+                new_line.inicio_gozo = line.get_value('GOZO_INICIO')
+                new_line.fim_gozo = line.get_value('GOZO_FIM')
+                new_line.abono_paga = line.get_value('ABONO_PAGA')
+                new_line.inicio_abono = line.get_value('ABONO_INICIO')
+                new_line.fim_abono = line.get_value('ABONO_FIM')
+                new_line.data_pagamento = line.get_value('DATA_PAGTO')
+                new_line.rubrica = rubric
+                new_line.valor_informado = data_rubric.get(rubric).get('VALOR_INFORMADO')
+                new_line.valor_calculado = data_rubric.get(rubric).get('VALOR_CALCULADO')
+
+                if not is_null(new_line.inicio_gozo):
                     new_line.save()
 
     def gerar_afastamentos_importacao(self, relacao_empresas, relacao_empregados):

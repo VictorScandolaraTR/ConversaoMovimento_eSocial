@@ -28,20 +28,20 @@ class DominioRescisao(peewee.Model):
 
 
 class DominioFerias(peewee.Model):
-    codi_emp = peewee.CharField(max_length=4, null=True)
-    i_empregados = peewee.CharField(max_length=8, null=True)
-    competencia = peewee.CharField(max_length=10, null=True)
-    inicio_aquisitivo = peewee.CharField(max_length=10, null=True)
-    fim_aquisitivo = peewee.CharField(max_length=10, null=True)
-    inicio_gozo = peewee.CharField(max_length=10, null=True)
-    fim_gozo = peewee.CharField(max_length=10, null=True)
-    abono_paga = peewee.CharField(max_length=1, null=True)
-    inicio_abono = peewee.CharField(max_length=10, null=True)
-    fim_abono = peewee.CharField(max_length=10, null=True)
-    data_pagamento = peewee.CharField(max_length=10, null=True)
-    i_eventos = peewee.CharField(max_length=4, null=True)
-    valor_informado = peewee.CharField(max_length=20, null=True)
-    valor_calculado = peewee.CharField(max_length=20, null=True)
+    codi_emp = peewee.IntegerField(null=True)
+    i_empregados = peewee.IntegerField(null=True)
+    competencia = peewee.DateField(null=True)
+    inicio_aquisitivo = peewee.DateField(null=True)
+    fim_aquisitivo = peewee.DateField(null=True)
+    inicio_gozo = peewee.DateField(null=True)
+    fim_gozo = peewee.DateField(null=True)
+    abono_paga = peewee.CharField(null=True)
+    inicio_abono = peewee.DateField(null=True)
+    fim_abono = peewee.DateField(null=True)
+    data_pagamento = peewee.DateField(null=True)
+    rubrica = peewee.IntegerField(null=True)
+    valor_informado = peewee.FloatField( null=True)
+    valor_calculado = peewee.FloatField(null=True)
 
     class Meta:
         database = db
