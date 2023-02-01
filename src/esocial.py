@@ -8,6 +8,7 @@ from src.classes.Table import Table
 from src.classes.StorageData import StorageData
 from src.classes.Sequencial import Sequencial
 from src.database.Sybase import Sybase
+from src.database.SQLite_tables import *
 from src.utils.functions import *
 from src.database.data_rubrics import *
 
@@ -861,6 +862,14 @@ class eSocialXML():
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFORMULAS.txt', rubrics_formula)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCAMENTOS_EVENTOS.txt', data_lancamentos_eventos)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCTO_MEDIAS.txt', data_lancto_medias)
+
+    def save_rescission_and_vacation(self, relacao_empresas, relacao_empregados):
+        """
+        Salvar dados de rescisão e férias que o RPA irá calcular
+        """
+        data = Table('FOAFASTAMENTOS_IMPORTACAO', file=f'{self.DIRETORIO_IMPORTAR}\\FOAFASTAMENTOS_IMPORTACAO.txt')
+        for line in data.items():
+            print(line.do_output())
 
     def gerar_afastamentos_importacao(self, relacao_empresas, relacao_empregados):
         """
