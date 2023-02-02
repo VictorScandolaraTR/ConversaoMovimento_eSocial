@@ -19,8 +19,8 @@ class eSocialXML():
         self.DIRETORIO_XML = f"{diretorio_xml}\\eventos"
         self.DIRETORIO_DOWNLOADS = f"{diretorio_xml}\\downloads"
         self.DIRETORIO_SAIDA = f"{diretorio_xml}\\saida"
-        self.DIRETORIO_IMPORTAR = f"{diretorio_xml}\\importar"
-        self.BANCO_SQLITE = f"{diretorio_xml}\\temp.db"
+        self.DIRETORIO_IMPORTAR = f"{diretorio_xml}\\rpa\\importar"
+        self.BANCO_SQLITE = f"{diretorio_xml}\\rpa\\temp.db"
         self.INIT_COMPETENCE = '01/01/2022'
         self.END_COMPETENCE = '01/01/2023'
 
@@ -722,7 +722,7 @@ class eSocialXML():
 
         writer.close()
 
-    def gerar_arquivos_saida(self, relacao_empresas, relacao_empregados):
+    def gerar_arquivos_saida(self, inscricao, codi_emp, relacao_empregados):
         """
         Gravar os arquivos de eventos, lançamentos e médias para importação.
 
@@ -742,7 +742,7 @@ class eSocialXML():
         self.read_rescission_rubrics(handle_lauch_rubrics)
 
         rubrics_esocial = self.generate_rubricas_esocial(generate_rubrics)
-        companies_rubrics = self.read_companies_rubrics(relacao_empresas, handle_lauch_rubrics)
+        companies_rubrics = self.read_companies_rubrics(inscricao, codi_emp, handle_lauch_rubrics)
         rubrics_importation, rubrics_base_calc_importation, rubrics_formula = self.complete_data_rubrics(rubrics_esocial, companies_rubrics, rubrics_relationship, rubrics_averages)
 
         data_lancamentos_eventos = []
@@ -757,11 +757,9 @@ class eSocialXML():
         for line in handle_lauch_rubrics:
             cnpj_empregador = line.get('nrInsc')
             cpf_empregado = line.get('cpfTrab')
-
-            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
-            if is_null(codi_emp) or is_null(i_empregados):
+            if is_null(codi_emp) or is_null(i_empregados) or cnpj_empregador != inscricao:
                 continue
 
             complete_competence = line.get('perApur')
@@ -869,7 +867,7 @@ class eSocialXML():
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCTO_MEDIAS.txt', data_lancto_medias)
         return data_vacation
 
-    def save_rescission(self, relacao_empresas, relacao_empregados):
+    def save_rescission(self, inscricao, codi_emp, relacao_empregados):
         """
         Salvar dados de rescisão que o RPA irá calcular
         """
@@ -883,9 +881,10 @@ class eSocialXML():
         for s2299 in self.dicionario_s2299:
             cnpj_empregador = self.dicionario_s2299[s2299].get("ideEmpregador").get("nrInsc")
             cpf_empregado = self.dicionario_s2299[s2299].get("ideVinculo").get("cpfTrab")
-
-            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+
+            if cnpj_empregador != inscricao:
+                continue
 
             infos = self.dicionario_s2299[s2299].get('infoDeslig')
             aviso_previo = infos.get('indPagtoAPI')
@@ -901,9 +900,10 @@ class eSocialXML():
         for s2399 in self.dicionario_s2399:
             cnpj_empregador = self.dicionario_s2399[s2399].get("ideEmpregador").get("nrInsc")
             cpf_empregado = self.dicionario_s2399[s2399].get("ideTrabSemVinculo").get("cpfTrab")
-
-            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+
+            if cnpj_empregador != inscricao:
+                continue
 
             data_rescission.add('contribuinte', [codi_emp, i_empregados, 'TIPO'])
 
@@ -994,7 +994,7 @@ class eSocialXML():
                 if not is_null(new_line.inicio_gozo):
                     new_line.save()
 
-    def gerar_afastamentos_importacao(self, relacao_empresas, relacao_empregados):
+    def gerar_afastamentos_importacao(self, inscricao, codi_emp, relacao_empregados):
         """
         Gera o arquivo FOAFASTAMENTOS_IMPORTACAO
         """
@@ -1009,6 +1009,9 @@ class eSocialXML():
         for s2230 in self.dicionario_s2230:
             cnpj_empregador = self.dicionario_s2230[s2230].get('ideEmpregador').get('nrInsc')
             cpf_empregado = self.dicionario_s2230[s2230].get('ideVinculo').get('cpfTrab')
+
+            if cnpj_empregador != inscricao:
+                continue
 
             data_inicio = ''
             data_fim = ''
@@ -1072,7 +1075,6 @@ class eSocialXML():
             for cpf_empregado in data_afastamentos_xml.get([cnpj_empregador]):
                 for data_inicio in data_afastamentos_xml.get([cnpj_empregador, cpf_empregado]):
                     infos_afastamento = data_afastamentos_xml.get([cnpj_empregador, cpf_empregado, data_inicio])
-                    codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
                     i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
                     if is_null(codi_emp) or is_null(i_empregados):
@@ -1113,8 +1115,6 @@ class eSocialXML():
         for s2299 in self.dicionario_s2299:
             cnpj_empregador = self.dicionario_s2299[s2299].get("ideEmpregador").get("nrInsc")
             cpf_empregado = self.dicionario_s2299[s2299].get("ideVinculo").get("cpfTrab")
-
-            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
             if is_null(codi_emp) or is_null(i_empregados):
@@ -1136,8 +1136,6 @@ class eSocialXML():
         for s2399 in self.dicionario_s2399:
             cnpj_empregador = self.dicionario_s2399[s2399].get("ideEmpregador").get("nrInsc")
             cpf_empregado = self.dicionario_s2399[s2399].get("ideTrabSemVinculo").get("cpfTrab")
-
-            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
             if is_null(codi_emp) or is_null(i_empregados):
@@ -1157,7 +1155,7 @@ class eSocialXML():
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOAFASTAMENTOS_IMPORTACAO.txt', data_foafastamentos_importacao)
 
-    def gerar_ferias_importacao(self, relacao_empresas, relacao_empregados):
+    def gerar_ferias_importacao(self, inscricao, codi_emp, relacao_empregados):
         """
         Gera os arquivos FOFERIAS_AQUISITIVOS e FOFERIAS_GOZO
         """
@@ -1174,13 +1172,15 @@ class eSocialXML():
             insc_empresa = self.dicionario_s2230[s2230].get('ideEmpregador').get('nrInsc')
             cpf_empregado = self.dicionario_s2230[s2230].get('ideVinculo').get('cpfTrab')
 
+            if insc_empresa != inscricao:
+                continue
+
             infos_afastamento = self.dicionario_s2230[s2230].get("infoAfastamento")
             motivo = infos_afastamento.get('iniAfastamento').get("codMotAfast")
 
             # Afastamentos de férias é código 15 no eSocial
             if motivo != '15': continue
 
-            codi_emp = str(relacao_empresas.get(insc_empresa).get('codigo'))
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
             if is_null(codi_emp) or is_null(i_empregados):
@@ -1360,7 +1360,7 @@ class eSocialXML():
 
         return rubrics_importation
 
-    def read_companies_rubrics(self, relacao_empresas, handle_lauch_rubrics):
+    def read_companies_rubrics(self, inscricao, codi_emp, handle_lauch_rubrics):
         """
         Retorna um dicionário de quais empresas utilizam determinada rúbrica
         """
@@ -1368,8 +1368,10 @@ class eSocialXML():
 
         for line in handle_lauch_rubrics:
             cnpj_empregador = line.get('nrInsc')
-            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
             i_eventos = int(line.get('codRubr'))
+
+            if cnpj_empregador != inscricao:
+                continue
 
             # adiciona a rubrica na lista de rubricas utilizadas pela empresa
             if i_eventos not in companies_rubrics.keys():

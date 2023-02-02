@@ -217,7 +217,7 @@ class eSocial(QtWidgets.QMainWindow):
                 self.__btn_obtem_dados_esocial.setEnabled(True)
                 self.__btn_relaciona_empresas_dominio.setEnabled(True)
                 self.__btn_relacionar_rubricas.setEnabled(True)
-                self.__btn_executa_rpa.setEnabled(False)
+                self.__btn_executa_rpa.setEnabled(True)
                 self.__btn_excluir.setEnabled(True)
                 self.__tabela_empresas.selectedItems()[3].setText("Planilha de rubricas geradas")
             case "R":
@@ -293,6 +293,24 @@ class eSocial(QtWidgets.QMainWindow):
         self.seleciona_registro()
 
     def executar_rpa(self):
+        inscricao = self.__tabela_empresas.selectedItems()[0].text()
+
+        esocial = eSocialXML(f"{self.__diretorio_trabalho}\\{inscricao}")
+        codi_emp = '1'
+        relacao_empregados = esocial.relaciona_empregados()
+
+        # gerar arquivos cadastrais
+        esocial.carregar_informacoes_xml()
+        esocial.gerar_afastamentos_importacao(inscricao, codi_emp, relacao_empregados)
+        esocial.gerar_ferias_importacao(inscricao, codi_emp, relacao_empregados)
+
+        # gerar arquivos para importação de lançamentos
+        data_vacation = esocial.gerar_arquivos_saida(inscricao, codi_emp, relacao_empregados)
+
+        # gerar férias e rescisões que irão ser calculadas pelo RPA
+        esocial.save_rescission(inscricao, codi_emp, relacao_empregados)
+        esocial.save_vacation(data_vacation)
+
         self.atualiza_status("Função RPA não configurada")
 
 
