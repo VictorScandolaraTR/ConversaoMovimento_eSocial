@@ -60,7 +60,7 @@ class eSocialXML():
         self.senha_dominio = parametros["senha_dominio"]
         self.empresa_padrao_rubricas = parametros["empresa_padrao_rubricas"]
         self.usuario_esocial = parametros["usuario_esocial"]
-        self.senha_dominio = parametros["senha_dominio"]
+        self.senha_esocial = parametros["senha_dominio"]
         self.certificado_esocial = parametros["certificado_esocial"]
         self.tipo_certificado_esocial = parametros["tipo_certificado_esocial"]
 
@@ -89,6 +89,7 @@ class eSocialXML():
     def configura_conexao_esocial(self,usuario,senha,certificado,tipo_certificado = "A1"):
         '''Configura conexão da classe com o portal e-Social'''
         self.usuario_esocial, self.senha_esocial, self.certificado_esocial, self.tipo_certificado_esocial = usuario, senha, certificado, tipo_certificado
+        self.salvar_parametros()
 
     def configura_conexao_dominio(self,banco,usuario,senha,empresa_padrao = "9999"):
         '''Configura conexão da classe com o banco Domínio'''
@@ -250,7 +251,7 @@ class eSocialXML():
 
         return dicionario_rubricas
 
-    def relaciona_empresas(self):
+    def relaciona_empresas(self,inscricao):
         '''Gera listagem de empresas que tem rubricas sendo tratadas'''
         dicionario_empresas = {}
         inscricoes_originais = {}
@@ -258,32 +259,19 @@ class eSocialXML():
 
         engine = create_engine("sybase+pyodbc://{user}:{pw}@{dsn}".format(user=self.usuario_dominio, pw=self.senha_dominio, dsn=self.base_dominio))
 
-        sql = "SELECT * FROM BETHADBA.GEEMPRE"
+        sql = "SELECT * FROM BETHADBA.GEEMPRE WHERE CGCE_EMP IN ('{cgc}','{cgc_comp}')".format(cgc=inscricao,cgc_comp=self.completar_cnpj(inscricao))
         df_empresas = pd.read_sql(sql,con=engine)
 
-        for rubrica in self.dicionario_s1010:
-            inscricao = self.dicionario_s1010.get(rubrica).get("ideEmpregador").get("nrInsc")
-
-            if(self.dicionario_s1010.get(rubrica).get("ideEmpregador").get("tpInsc")=="1"):
-                inscricoes_originais[self.completar_cnpj(inscricao)] = inscricao
-                inscricao = self.completar_cnpj(inscricao)
-            else:
-                inscricoes_originais[inscricao] = inscricao
-
-            if inscricao not in cgcs_rubricas:
-                cgcs_rubricas.append(inscricao)
-
         for i in range(len(df_empresas)):
-            if(df_empresas.loc[i,"cgce_emp"] in cgcs_rubricas):
-                inscricao = df_empresas.loc[i,"cgce_emp"]
-                inscricao_original = inscricoes_originais[inscricao]
+            inscricao = df_empresas.loc[i,"cgce_emp"]
+            codigo = df_empresas.loc[i,"codi_emp"]
+            nome = df_empresas.loc[i,"nome_emp"]
 
-                dicionario_empresas[inscricao_original] = {
-                    "codigo":df_empresas.loc[i,"codi_emp"],
-                    "nome":df_empresas.loc[i,"nome_emp"],
-                    "cgc":inscricao,
-                    "processar": "S"
-                }
+            dicionario_empresas[i] = {
+                "codigo": codigo,
+                "nome": nome,
+                "cgc": inscricao
+            }
 
         return dicionario_empresas
 
@@ -421,7 +409,7 @@ class eSocialXML():
 
             self.dicionario_rubricas_dominio[i_eventos] = rubrica
     
-    def gera_excel_relacao(self, empresas):
+    def gera_excel_relacao(self, empresa):
         '''Gera o excel com as rubricas para relacionar com as rubricas padrão do Domínio'''
 
         linhas_excel_alerta = set()
@@ -436,9 +424,8 @@ class eSocialXML():
         print("Relacionando rubricas")
         for s1010 in tqdm(self.dicionario_s1010):
             inscricao = self.dicionario_s1010.get(s1010).get('ideEmpregador').get('nrInsc')
-            processa_empresa = empresas.get(inscricao).get("processar")
-
-            if(processa_empresa=="S"):
+            
+            if(inscricao==empresa):
                 codigo = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('ideRubrica').get('codRubr')
 
                 if (codigo not in lista_rubricas):
