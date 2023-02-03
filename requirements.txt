@@ -8,3 +8,4 @@ sqlalchemy
 sqlalchemy-sybase
 peewee
 autoit
+PySide6
