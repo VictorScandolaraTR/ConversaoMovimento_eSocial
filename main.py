@@ -4,6 +4,7 @@ from src.esocial import eSocialXML
 from src.ui.esocial_unico import Ui_MainWindow as Interface
 from src.ui.dialog_configuaracoes import Ui_dialog_configuracioes as DialogConfiguracoes
 from sqlalchemy import create_engine, Table, update
+import src.utils.components as components
 import pandas as pd
 import os, json, sys
 
@@ -21,7 +22,7 @@ class eSocial(QMainWindow):
         """
         self.__window.setupUi(self)
         self.setWindowTitle('Conversão de Movimentos - e-Social')
-        
+
         self.__tabela_empresas = self.__window.tableWidget
         self.__edit_inscricao = self.__window.edit_inscricao
         self.__btn_adiciona_empresa = self.__window.btn_adiciona_empresa
@@ -243,7 +244,7 @@ class eSocial(QMainWindow):
             case ""|None:
                 self.__btn_conexoes.setEnabled(True)
                 self.__btn_obtem_dados_esocial.setEnabled(True)
-                self.__btn_relaciona_empresas_dominio.setEnabled(False)
+                self.__btn_relaciona_empresas_dominio.setEnabled(True)
                 self.__btn_relacionar_rubricas.setEnabled(False)
                 self.__btn_executa_rpa.setEnabled(False)
                 self.__btn_excluir.setEnabled(True)
@@ -303,12 +304,12 @@ class eSocial(QMainWindow):
         esocial.configura_conexao_esocial(usuario, senha, certificado, tipo)
         esocial.baixar_dados_esocial()
         
-        self.atualiza_status("Lendo informações...")
+        '''self.atualiza_status("Lendo informações...")
         esocial.extrair_arquivos_xml()
         esocial.carregar_informacoes_xml()
 
         self.atualiza_status("Dados carregados do e-Social","E")
-        self.seleciona_registro()
+        self.seleciona_registro()'''
 
     def relaciona_empresa_dominio(self):
         self.atualiza_status("Consultando banco de dados Domínio...")
@@ -378,6 +379,8 @@ class eSocialConfiguracoes(QMainWindow):
         self.__window.setupUi(self)
         self.setWindowTitle('Configuração de credenciais')
 
+        #cself.__widget = self.__window.centralwidget
+
         self.__btn_cancelar = self.__window.btn_concertar_configuracoes
         self.__btn_confirmar_configuracoes = self.__window.btn_confirmar_configuracoes
 
@@ -385,6 +388,7 @@ class eSocialConfiguracoes(QMainWindow):
         self.__edit_senha_certificado = self.__window.edit_senha_certificado
         self.__combo_tipo_certificado = self.__window.combo_tipo_certificado
         self.__edit_caminho_certificado = self.__window.edit_caminho_certificado
+        self.__btn_busca_certificado = self.__window.btn_busca_certificado
 
         self.__edit_banco_dominio = self.__window.edit_banco_dominio
         self.__edit_usuario_dominio = self.__window.edit_usuario_dominio
@@ -394,10 +398,10 @@ class eSocialConfiguracoes(QMainWindow):
         self.__edit_usuario_sgd = self.__window.edit_usuario_sgd
         self.__edit_senha_sgd = self.__window.edit_senha_sgd
 
+        self.__btn_busca_certificado.clicked.connect(self.busca_certificado)
         self.__btn_cancelar.clicked.connect(self.close)
         self.__btn_confirmar_configuracoes.clicked.connect(self.salvar)
 
-        print(configuracao)
         self.__edit_usuario_certificado.setText(configuracao["usuario_esocial"])
         self.__edit_senha_certificado.setText(configuracao["senha_esocial"])
         self.__combo_tipo_certificado.setCurrentText(configuracao["tipo_certificado_esocial"])
@@ -405,14 +409,15 @@ class eSocialConfiguracoes(QMainWindow):
         self.__edit_banco_dominio.setText(configuracao["base_dominio"])
         self.__edit_usuario_dominio.setText(configuracao["usuario_dominio"])
         self.__edit_senha_dominio.setText(configuracao["senha_dominio"])
-        self.__edit_empresa_rubricas_dominio.setText(configuracao["empresa_padrao_rubricas"])
+        self.__edit_empresa_rubricas_dominio.setText(str(configuracao["empresa_padrao_rubricas"]))
         self.__edit_usuario_sgd.setText(configuracao["usuario_sgd"])
         self.__edit_senha_sgd.setText(configuracao["senha_sgd"])
 
         self.show()
 
     def busca_certificado(self):
-        pass
+        path = components.ask_file(self.__widget, 'Selecione o certificado.')
+        self.__edit_caminho_certificado.setText(path)
 
     def salvar(self):
         dados = {
