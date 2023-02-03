@@ -1,61 +1,57 @@
-from datetime import datetime
-from PySide6.QtCore import QObject, Signal
 import logging
-from os import remove, mkdir
+from os import mkdir
 from os.path import isfile, isdir
-from shutil import copy, make_archive, move, rmtree, copytree
-import json
+from shutil import copy, move, make_archive, rmtree, copytree
 import socket
 from threading import Thread
 import multiprocessing
-from rpa.agent import Agent
 from time import sleep
 
-from extractors.Sybase import Sybase
-from database.def_tables.def_tables import Table
-from utils.check_functions_rpa import check_companies_calc
-from utils.convert_log import ConvertLogHTML
-from database.temp.rpa import (
+from src.rpa.agent import Agent
+from src.database.Sybase import Sybase
+from src.classes.Table import Table
+from src.rpa.check_functions_rpa import check_companies_calc
+from src.database.SQLite_tables import (
     DominioFerias,
-    DominioRescisoes
+    DominioRescisao
 )
+from src.utils.functions import *
 
 
-class RPA(QObject):
-    finished = Signal()
-    success = Signal(bool, str)
-    progress = Signal(list)
-
+class RPA:
     DEFAULT_PORT = 1112
     SIZE_BUFFER_PACKETS = 1024
     DEFAULT_USER = 'GERENTE'
     DEFAULT_PASSWORD = 'gerente'
     DEFAULT_PASSWORD_CREATED = '123456'
 
-    def prepare(self, path_prontos, path_converion, init_competence, end_competence, companies_cal, database, username,
-                password, sgd_username, sgd_password, local, machines):
+    def __init__(self, path_converion, database, username, password, sgd_username, sgd_password):
+        """
+        Recebe os parâmetros para a execução do RPA
+        """
         self.__conversion_path = str(path_converion).replace('.\\', "")
-        self.__path_prontos = path_prontos
-        self.__init_competence = datetime.strptime(f'01/{init_competence}', '%d/%m/%Y')
-        self.__end_competence = datetime.strptime(f'01/{end_competence}', '%d/%m/%Y')
+        self.__path_prontos = f'{self.__conversion_path}\\importar'
         self.__database = database
         self.__username = username
         self.__password = password
-        self.__companies_calc = list(companies_cal)
         self.__sgd_username = sgd_username
         self.__sgd_password = sgd_password
-        self.__machines = machines
-        self.__local = local
-        self.__current_company = -1
+        self.__companies_calc = list()
+        self.__init_competence = ''
+        self.__end_competence = ''
 
-        logging.basicConfig(filename=f'{self.__conversion_path}\\Temp\\messages.log', encoding='utf-8',
-                            level=logging.INFO, filemode='w')
+        # variáveis utilizadas para controle dos agentes
+        self.__init_server = False
+
+    def prepare(self, codi_emp, init_competence, end_competence):
+        """
+        Organiza todos os dados que é necessário para execução do RPA
+        """
+        self.__companies_calc = list([int(codi_emp)])
+        self.__init_competence = datetime.strptime(f'01/{init_competence}', '%d/%m/%Y')
+        self.__end_competence = datetime.strptime(f'01/{end_competence}', '%d/%m/%Y')
+
         self.prepare_data_calc()
-        self.save_companies_to_calc()
-
-        if self.__machines:
-            self.compact_data_calc()
-            self.send_data(self.__machines)
 
     def create_folder(self, name_folder):
         """
@@ -67,10 +63,10 @@ class RPA(QObject):
 
     def prepare_data_calc(self):
         """
-        Gera na pasta "temp" da conversão, um arquivo zip com os dados necessários para calculos
+        Gera o arquivo de configuração para o RPA e organiza os dados que ele precisa
+        para ser executado
         """
-        self.create_folder(f'{self.__conversion_path}\\temp\\data_calc')
-        self.create_folder(f'{self.__conversion_path}\\temp\\data_calc\\prontos')
+        self.create_folder(f'{self.__conversion_path}\\prontos')
 
         # cria um arquivo de configuração para o RPA
         config_data = {
@@ -83,28 +79,50 @@ class RPA(QObject):
             'sgd_password': self.__sgd_password
         }
 
-        with open(f'{self.__conversion_path}\\temp\\data_calc\\run.conf', 'w') as outfile:
+        with open(f'{self.__conversion_path}\\run.conf', 'w') as outfile:
             json.dump(config_data, outfile)
 
-        copy(f'{self.__path_prontos}\\2-Arquivos importacao\\FOAFASTAMENTOS_IMPORTACAO.txt',
-             f'{self.__conversion_path}\\temp\\data_calc\\prontos')
-        copy(f'{self.__path_prontos}\\2-Arquivos importacao\\FOFERIAS_GOZO.txt',
-             f'{self.__conversion_path}\\temp\\data_calc\\prontos')
-        copytree(f'{self.__conversion_path}\\Importar', f'{self.__conversion_path}\\temp\\data_calc\\Importar')
-        copytree(f'{self.__conversion_path}\\SQLs', f'{self.__conversion_path}\\temp\\data_calc\\SQLs')
-        copy(f'{self.__path_prontos}\\3-Comandos pos-importacao\\comando_ajusta_demitidos_importacao_ferias.sql',
-             f'{self.__conversion_path}\\temp\\data_calc\\SQLs\\ajusta_demitidos.sql')
-        copy(f'{self.__conversion_path}\\Temp\\temp.db', f'{self.__conversion_path}\\temp\\data_calc\\query.db')
+        # copiar dados cadastrais para uma pasta separada
+        for file in ['FOAFASTAMENTOS_IMPORTACAO', 'FOFERIAS_AQUISITIVOS', 'FOFERIAS_GOZO']:
+            origin = f'{self.__path_prontos}\\{file}.txt'
+            destiny = f'{self.__conversion_path}\\prontos'
+            copy(origin, destiny)
+            remove(origin)
+
+        # copiar SQLs necessários
+        if isdir(f'{self.__conversion_path}\\SQLs'):
+            rmtree(f'{self.__conversion_path}\\SQLs')
+        copytree(f'.\\SQLs', f'{self.__conversion_path}\\SQLs')
+
+    def prepare_machines_for_calc(self, local_run, machines):
+        """
+        Se conecta com os agentes nas máquinas que irão ser utilizadas para cálculo
+        """
+        # Thread(target=self.init_server_communication).start()
+        #
+        # if local_run:
+        #     Thread(target=self.init_local_agent).start()
+        #
+        # self.await_connections(local_run, machines)
+        #
+        # # Fica verificando novas conexões
+        # Thread(target=self.await_new_connections).start()
+
+        # if machines:
+        if True:
+            self.compact_data_calc()
+            # self.send_data(machines)
 
     def compact_data_calc(self):
         """
         Compacta os dados necessários no calculo para serem enviados para as máquinas na rede
         """
-        make_archive('send_data', 'zip', f'{self.__conversion_path}\\temp\\data_calc')
-        if isfile(f'{self.__conversion_path}\\Temp\\send_data.zip'):
-            remove(f'{self.__conversion_path}\\Temp\\send_data.zip')
+        path_zip = self.__conversion_path.replace('rpa', '')
+        if isfile(f'{self.__conversion_path}\\send_data.zip'):
+            remove(f'{self.__conversion_path}\\send_data.zip')
 
-        move('send_data.zip', f'{self.__conversion_path}\\Temp')
+        make_archive('send_data', 'zip', path_zip)
+        move('send_data.zip', self.__conversion_path)
 
     def send_data(self, machines):
         """
@@ -123,7 +141,7 @@ class RPA(QObject):
             conn, _ = sock.accept()
 
             # enviar arquivo compactado
-            with open(f'{self.__conversion_path}\\Temp\\send_data.zip', 'rb') as send_file:
+            with open(f'{self.__conversion_path}\\send_data.zip', 'rb') as send_file:
                 while True:
                     packet = send_file.read(self.SIZE_BUFFER_PACKETS)
                     if not packet:
@@ -132,13 +150,6 @@ class RPA(QObject):
 
             conn.close()
             sock.close()
-
-    def save_companies_to_calc(self):
-        """
-        Salva quais empresas e competências precisam ser calculadas,
-        além de salvar quais importações precisam ser feitas
-        """
-        pass
 
     def get_dependents(self):
         """
@@ -214,8 +225,7 @@ class RPA(QObject):
         try:
             process = multiprocessing.Pool()
             rpa = Agent()
-            process.apply_async(rpa.start, args=(
-            'localhost', f'{self.__conversion_path}\\Temp\\data_calc', [51, 41, 60, 52, 11, 70, 100, 42]))
+            process.apply_async(rpa.start, args=('localhost', self.__conversion_path, [51, 41, 60, 52, 11, 70, 100, 42]))
             process.close()
             process.join()
         except Exception as e:
@@ -245,20 +255,23 @@ class RPA(QObject):
             ignore_companies = check_companies_calc(self.__database, self.__username, self.__password)
             total_competences = 0
 
+            print(ignore_companies, self.__companies_calc)
             # dados de holerites
-            data = Table('FOLANCAMENTOS_EVENTOS', file=f'{self.__conversion_path}\\Importar\\FOLANCAMENTOS_EVENTOS.txt')
+            data = Table('FOLANCAMENTOS_EVENTOS', file=f'{self.__conversion_path}\\importar\\FOLANCAMENTOS_EVENTOS.txt')
             for item in data.items():
-                if int(item['CODI_EMP']) not in ignore_companies and int(item['CODI_EMP']) in self.__companies_calc:
-                    if int(item['CODI_EMP']) not in result.keys():
-                        result[int(item['CODI_EMP'])] = {}
+                codi_emp = int(item.get_value('CODI_EMP'))
+                competencia = item.get_value('COMPETENCIA_INICIAL')
+                if codi_emp not in ignore_companies and codi_emp in self.__companies_calc:
+                    if codi_emp not in result.keys():
+                        result[codi_emp] = {}
 
-                    if item['COMPETENCIA_INICIAL'] not in result[int(item['CODI_EMP'])].keys():
-                        result[int(item['CODI_EMP'])][item['COMPETENCIA_INICIAL']] = 1
+                    if competencia not in result[codi_emp].keys():
+                        result[codi_emp][competencia] = 1
                         total_competences += 1
 
             # dados de rescisões
-            sqlite_rescisao = DominioRescisoes()
-            sqlite_rescisao.connect(f'{self.__conversion_path}\\Temp\\temp.db')
+            sqlite_rescisao = DominioRescisao()
+            sqlite_rescisao.connect(f'{self.__conversion_path}\\temp.db')
             data_rescisao = sqlite_rescisao.select().dicts()
 
             # organizar os dados
@@ -273,7 +286,7 @@ class RPA(QObject):
 
             # dados de férias
             sqlite_ferias = DominioFerias()
-            sqlite_ferias.connect(f'{self.__conversion_path}\\Temp\\temp.db')
+            sqlite_ferias.connect(f'{self.__conversion_path}\\temp.db')
             data_vacation_calc = sqlite_ferias.select().dicts()
 
             for row in data_vacation_calc:
@@ -289,56 +302,57 @@ class RPA(QObject):
 
             return total_competences
         except Exception as e:
+            print(e)
             self.print_in_log(error=str(e))
 
-    def await_connections(self):
+    def await_connections(self, local_run, machines):
         """
         Espera as estações se conectarem ao servidor
         e abre uma thread para cada execução.
         """
-        total_stations = len(self.__machines)
-        if self.__local:
+        total_stations = len(machines)
+        if local_run:
             total_stations += 1
 
         # o processo de calculo equivale a 65% da barra de progresso
         # e aqui dividimos os 65% pelo numero de competências a serem calculadas
         self.current_percent = 25
         total_competences = self.read_competences()
-
-        self.sum_percent = (65 / total_competences)
-
-        # etapas de importação
-        self.__init_create_users = False
-        self.__users_to_create = total_stations
-        self.__end_create_users = False
-        self.__init_import_events = False
-        self.__end_import_events = False
-        self.__init_import_removals = False
-        self.__end_import_removals = False
-        self.__init_import_vacation = False
-        self.__end_import_vacation = False
-        self.__init_calc = False
-        self.__companies_calc_finished = []
-        self.__init_finish_process = False
-        self.__end_finish_process = False
-
-        self.__user_connection = {}
-        connections = 0
-        try:
-            while connections < total_stations:
-                if self.__init_server:
-                    try:
-                        client, address = self.server.accept()
-                        self.__user_connection[address[0]] = False
-                        connections += 1
-                        Thread(target=self.handle_client, args=(client, address[0])).start()
-                    except Exception as e:
-                        print(e)
-                        self.print_in_log(error=str(e))
-
-        except Exception as e:
-            self.print_in_log(error=str(e))
-            return False
+        print(total_competences)
+        # self.sum_percent = (65 / total_competences)
+        #
+        # # etapas de importação
+        # self.__init_create_users = False
+        # self.__users_to_create = total_stations
+        # self.__end_create_users = False
+        # self.__init_import_events = False
+        # self.__end_import_events = False
+        # self.__init_import_removals = False
+        # self.__end_import_removals = False
+        # self.__init_import_vacation = False
+        # self.__end_import_vacation = False
+        # self.__init_calc = False
+        # self.__companies_calc_finished = []
+        # self.__init_finish_process = False
+        # self.__end_finish_process = False
+        #
+        # self.__user_connection = {}
+        # connections = 0
+        # try:
+        #     while connections < total_stations:
+        #         if self.__init_server:
+        #             try:
+        #                 client, address = self.server.accept()
+        #                 self.__user_connection[address[0]] = False
+        #                 connections += 1
+        #                 Thread(target=self.handle_client, args=(client, address[0])).start()
+        #             except Exception as e:
+        #                 print(e)
+        #                 self.print_in_log(error=str(e))
+        #
+        # except Exception as e:
+        #     self.print_in_log(error=str(e))
+        #     return False
 
     def await_new_connections(self):
         """
@@ -352,9 +366,7 @@ class RPA(QObject):
                         client, address = self.server.accept()
                         Thread(target=self.handle_client, args=(client, address[0])).start()
                     except Exception as e:
-                        print(e)
                         self.print_in_log(error=str(e))
-
         except Exception as e:
             self.print_in_log(error=str(e))
             return False
@@ -720,42 +732,16 @@ class RPA(QObject):
         self.invalid_records = False
 
         self.check_cadastral_conversion()
-        if self.invalid_records:
-            ConvertLogHTML(f'{self.__conversion_path}\\Temp\\messages.log')
-
         return self.invalid_records
 
     def start(self):
-        try:
-            self.print_in_log(init=True)
-            self.progress.emit(['Criando arquivo de log...', 5])
+        self.print_in_log(init=True)
 
-            self.check_cadastral_conversion(remove_company=True)
+        self.check_cadastral_conversion(remove_company=True)
 
-            self.progress.emit(['Preparando agentes de execução...', 10])
-            self.__init_server = False
-            Thread(target=self.init_server_communication).start()
 
-            if self.__local:
-                Thread(target=self.init_local_agent).start()
+        # aguarda enquanto estiver agentes em execução
+        while not self.__end_finish_process:
+            sleep(3)
 
-            self.progress.emit(['Distribuindo empresas entre os agentes...', 12])
-            self.await_connections()
-
-            self.progress.emit(['Configurando ambiente para cálculo...', 15])
-
-            # Fica verificando novas conexões
-            Thread(target=self.await_new_connections).start()
-            # aguarda enquanto estiver agentes em execução
-            while not self.__end_finish_process:
-                sleep(3)
-
-            self.print_in_log(end=True)
-            ConvertLogHTML(f'{self.__conversion_path}\\Temp\\messages.log', ignore_firts_lines=True)
-            self.success.emit(True, '')
-            self.finished.emit()
-        except Exception as e:
-            self.print_in_log(error=e)
-            self.print_in_log(end=True)
-            self.success.emit(False, 'Erro ao executar cálculos!')
-            self.finished.emit()
+        self.print_in_log(end=True)

@@ -1,4 +1,5 @@
 from pyodbc import connect
+from src.utils.functions import *
 
 class Sybase:
 
@@ -235,3 +236,337 @@ class Sybase:
                 result[codi_emp] = cgce_emp
 
         return result
+
+    def select_dependents(self, connection):
+        """
+        Seleciona os dependentes que não possuem data de nascimento preenchida
+        """
+        cursor = connection.cursor()
+
+        try:
+            cursor.execute(f"""SELECT
+                                CODI_EMP,
+                                I_EMPREGADOS,
+                                I_FILHOS,
+                                NOME
+                            FROM bethadba.fofilhos
+                            WHERE data_nascto is null
+                            """)
+
+            header = [i[0] for i in cursor.description]
+            rows = cursor.fetchall()
+
+            result = []
+            if len(rows) > 0:
+                for row in rows:
+                    result.append(dict(zip(header, row)))
+
+                return result
+            else:
+                return False
+
+        except:
+            return False
+
+    def select_services(self, connection):
+        """
+        Seleciona os serviços que estão vinculados a algum empresa e que
+        não possuem o campo FPAS preenchido
+        """
+        cursor = connection.cursor()
+
+        try:
+            cursor.execute(f"""SELECT
+                                    S.CODI_EMP,
+                                    S.I_SERVICOS,
+                                    S.VIGENCIA,
+                                    S.CGC
+                                FROM bethadba.FOVIGENCIAS_SERVICO AS S
+                                WHERE S.CODIGO_FPAS = '' AND EXISTS(
+                                                                    SELECT 1
+                                                                    FROM bethadba.FOEMPREGADOS AS E
+                                                                    WHERE S.CODI_EMP = E.CODI_EMP AND
+                                                                          S.I_SERVICOS = E.I_SERVICOS)
+                                ORDER BY 1, 2, 3
+                            """)
+
+            header = [i[0] for i in cursor.description]
+            rows = cursor.fetchall()
+
+            result = []
+            if len(rows) > 0:
+                for row in rows:
+                    result.append(dict(zip(header, row)))
+
+                return result
+            else:
+                return False
+
+        except:
+            return False
+
+    def select_invalid_resp_leval(self, connection):
+        """
+        Seleciona as empresas que são do tipo CPF e que não possuem responsável legal informado
+        """
+        cursor = connection.cursor()
+
+        try:
+            cursor.execute("""SELECT CODI_EMP
+                              FROM BETHADBA.GEEMPRE
+                              WHERE TINS_EMP = 2 AND 
+                              (CPF_LEG_EMP = '' OR CPF_LEG_EMP IS NULL)
+                           """)
+
+            header = [i[0] for i in cursor.description]
+            rows = cursor.fetchall()
+
+            result = []
+            if len(rows) > 0:
+                for row in rows:
+                    result.append(dict(zip(header, row)))
+
+                return result
+            else:
+                return False
+        except:
+            return False
+
+    def close_connection(self, connection):
+        connection.close()
+        return
+
+    def select_rubrics_generated(self, connection, company_filter, competence_filter):
+        cursor = connection.cursor()
+
+        query = f"""SELECT FOMOVTOSERV.CODI_EMP AS CP_EMPRESA,
+	                   FOMOVTOSERV.I_EMPREGADOS AS CP_EMPREGADO,
+                       FOMOVTOSERV.DATA AS CP_DATA,
+                       (SELECT FOBASES.data_pagto 
+                        FROM BETHADBA.FOBASES AS FOBASES
+                        WHERE FOMOVTOSERV.CODI_EMP IN(FOBASES.CODI_EMP) AND 
+                              FOMOVTOSERV.I_EMPREGADOS IN(FOBASES.I_EMPREGADOS) AND 
+                              FOMOVTOSERV.DATA IN(FOBASES.competencia) AND 
+                              FOMOVTOSERV.TIPO_PROCES IN(FOBASES.TIPO_PROCESS)) AS CP_DATA_PAGAMENTO,
+	                   FOMOVTOSERV.TIPO_PROCES AS CP_PROCESSO,
+                       FOMOVTOSERV.I_EVENTOS AS CP_EVENTO,
+                       FOMOVTOSERV.VALOR_INF AS CP_VALOR_INFORMADO,
+                       FOMOVTOSERV.RATEIO AS CP_RATEIO,
+		               FOMOVTOSERV.ORIGEM AS CP_ORIGEM,
+                       FOMOVTOSERV.I_CALCULOS AS CP_CALCULO,
+                       CP_RESCISAO = CASE WHEN (SELECT 1 
+                                                FROM BETHADBA.forescisoes AS forescisoes 
+                                                WHERE forescisoes.codi_emp = CP_EMPRESA AND
+                                                      forescisoes.i_empregados = CP_EMPREGADO AND
+                                                      forescisoes.I_CALCULOS = CP_CALCULO) = 1 THEN 'TRUE'
+                          ELSE 'FALSE' END
+                    FROM BETHADBA.FOMOVTOSERV AS FOMOVTOSERV
+                    WHERE NOT EXISTS (SELECT 1 
+                                      FROM BETHADBA.FOLANCAMENTOS_EVENTOS 
+                                      WHERE FOLANCAMENTOS_EVENTOS.CODI_EMP IN(CP_EMPRESA) AND 
+                                            FOLANCAMENTOS_EVENTOS.I_EMPREGADOS IN(CP_EMPREGADO) AND 
+                                            FOLANCAMENTOS_EVENTOS.COMPETENCIA_INICIAL IN(CP_DATA) AND 
+                                            FOLANCAMENTOS_EVENTOS.TIPO_PROCESSO IN(CP_PROCESSO) AND 
+                                            FOLANCAMENTOS_EVENTOS.I_EVENTOS IN(CP_EVENTO))
+                    AND CP_PROCESSO IN (51, 41, 52, 11, 70, 42)
+                    AND CP_EMPRESA IN ('{company_filter}')
+                    AND CP_ORIGEM NOT IN ('F')
+                    AND CP_RATEIO IN ('0')
+                    AND CP_EVENTO NOT IN ('9176', '9177', '9178')
+                    ORDER BY CP_EMPRESA, CP_EMPREGADO, CP_DATA, CP_PROCESSO
+                """
+
+        query_vacation = f"""SELECT FOMOVTOSERV.CODI_EMP AS CP_EMPRESA,
+		                    FOMOVTOSERV.I_EMPREGADOS AS CP_EMPREGADO,
+                            FOMOVTOSERV.DATA AS CP_DATA,
+                            CP_DATA_PAGAMENTO = (SELECT FOBASES.data_pagto
+                                                 FROM BETHADBA.FOBASES AS FOBASES
+                                                 WHERE FOMOVTOSERV.CODI_EMP IN(FOBASES.CODI_EMP) AND
+                                                       FOMOVTOSERV.I_EMPREGADOS IN(FOBASES.I_EMPREGADOS) AND 
+                                                       FOMOVTOSERV.DATA IN(FOBASES.competencia) AND 
+                                                       FOMOVTOSERV.TIPO_PROCES IN(FOBASES.TIPO_PROCESS) 
+								                ),
+                            FOMOVTOSERV.TIPO_PROCES AS CP_PROCESSO,
+                            FOMOVTOSERV.I_EVENTOS AS CP_EVENTO,
+                            FOMOVTOSERV.VALOR_INF AS CP_VALOR_INFORMADO,
+                            FOMOVTOSERV.RATEIO AS CP_RATEIO,
+                            CP_GOZO = (SELECT FOFERIAS_GOZO.I_FERIAS_GOZO
+		                               FROM BETHADBA.FOFERIAS_GOZO AS FOFERIAS_GOZO
+                                       WHERE FOFERIAS_GOZO.CODI_EMP = CP_EMPRESA AND
+                                                                      FOFERIAS_GOZO.I_EMPREGADOS = CP_EMPREGADO AND
+                                                                      CP_DATA >= FOFERIAS_GOZO.GOZO_INICIO AND
+                                                                      CP_DATA <= FOFERIAS_GOZO.GOZO_FIM),
+                            CP_INICIO_GOZO = (SELECT FOFERIAS_GOZO.GOZO_INICIO
+		                               FROM BETHADBA.FOFERIAS_GOZO AS FOFERIAS_GOZO
+                                       WHERE FOFERIAS_GOZO.CODI_EMP = CP_EMPRESA AND
+                                                                      FOFERIAS_GOZO.I_EMPREGADOS = CP_EMPREGADO AND
+                                                                      CP_DATA >= FOFERIAS_GOZO.GOZO_INICIO AND
+                                                                      CP_DATA <= FOFERIAS_GOZO.GOZO_FIM)
+                            FROM BETHADBA.FOMOVTOSERV AS FOMOVTOSERV
+                            WHERE NOT EXISTS (SELECT 1 
+                                              FROM BETHADBA.FOFERIAS_LANCAMENTOS
+                                              WHERE FOFERIAS_LANCAMENTOS.CODI_EMP IN(CP_EMPRESA) AND 
+                                                    FOFERIAS_LANCAMENTOS.I_EMPREGADOS IN(CP_EMPREGADO) AND
+                                                    FOFERIAS_LANCAMENTOS.I_FERIAS_GOZO IN(CP_GOZO) AND 
+                                                    FOFERIAS_LANCAMENTOS.I_EVENTOS IN(CP_EVENTO))
+                                  AND CP_PROCESSO IN (60, 61)
+                                  AND CP_EMPRESA IN ('{company_filter}')
+                                  AND CP_EVENTO NOT IN ('9178')
+                                  AND CP_INICIO_GOZO IS NOT NULL
+                            ORDER BY CP_EMPRESA, CP_EMPREGADO, CP_DATA, CP_PROCESSO
+                        """
+
+        # dados de calculo de folhas
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        result = {}
+        for row in rows:
+            competence = row[2].strftime('%d/%m/%Y')
+            payment_day = row[3].strftime('%Y-%m-%d')
+
+            if competence == competence_filter:
+                if row[10] == 'FALSE':
+                    if int(row[4]) not in result.keys():
+                        result[int(row[4])] = {}
+                    if payment_day not in result[int(row[4])].keys():
+                        result[int(row[4])][payment_day] = []
+
+                    if int(row[1]) not in result[int(row[4])][payment_day]:
+                        result[int(row[4])][payment_day].append(int(row[1]))
+                else:
+                    if int(row[4]) == 42:
+                        if 42 not in result.keys():
+                            result[42] = []
+
+                        if int(row[1]) not in result[42]:
+                            result[42].append(int(row[1]))
+                    else:
+                        if 100 not in result.keys():
+                            result[100] = []
+
+                        if int(row[1]) not in result[100]:
+                            result[100].append(int(row[1]))
+
+        # dados de calculo de férias
+        cursor.execute(query_vacation)
+        rows = cursor.fetchall()
+
+        for row in rows:
+            competence = datetime.strftime(row[9], '%d/%m/%Y')
+            competence = datetime.strptime(competence, '%d/%m/%Y').replace(day=1)
+            competence = datetime.strftime(competence, '%d/%m/%Y')
+            inicio_gozo_converted = format_date(row[9], '%Y-%m-%d')
+
+            if competence == competence_filter:
+                i_empregados = int(row[1])
+                if 60 not in result.keys():
+                    result[60] = {}
+                if i_empregados not in result[60].keys():
+                    result[60][i_empregados] = []
+
+                data = {'inicio_gozo': inicio_gozo_converted}
+                if data not in result[60][i_empregados]:
+                    result[60][i_empregados].append(data)
+
+        return result
+
+    def select_gozo_ferias(self, connection):
+        cursor = connection.cursor()
+        query = """SELECT CODI_EMP,
+	                   I_EMPREGADOS,
+                       GOZO_INICIO,
+                       I_FERIAS_GOZO,
+                       INICIO_AQUISITIVO
+                    FROM BETHADBA.FOFERIAS_GOZO
+                """
+
+        try:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+
+            result = {}
+            for row in rows:
+                init_aqui = row[4].strftime('%d/%m/%Y')
+                init_gozo = row[2].strftime('%d/%m/%Y')
+
+                if int(row[0]) not in result.keys():
+                    result[int(row[0])] = {}
+                if int(row[1]) not in result[int(row[0])].keys():
+                    result[int(row[0])][int(row[1])] = {}
+                if init_gozo not in result[int(row[0])][int(row[1])].keys():
+                    result[int(row[0])][int(row[1])][init_gozo] = {
+                        'i_ferias_gozo': int(row[3]),
+                        'inicio_aquisitivo': init_aqui
+                    }
+
+            return result
+
+        except:
+            return False
+
+    def select_acquisition_data(self, connection, company, employee):
+        cursor = connection.cursor()
+        query = f"""
+            SELECT TOP 1 DATA_FIM
+            FROM BETHADBA.FOFERIAS_AQUISITIVOS
+            WHERE CODI_EMP = '{company}' AND I_EMPREGADOS = '{employee}' AND SITUACAO != '3'
+            ORDER BY DATA_INICIO
+        """
+
+        try:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+
+            for row in rows:
+                end_acquisition = datetime.strftime(row[0], '%d/%m/%Y')
+                return end_acquisition
+
+        except:
+            return False
+
+    def select_data_vacation(self, connection):
+        cursor = connection.cursor()
+
+        try:
+            # extrair gozos de férias
+            cursor.execute("""SELECT CODI_EMP, 
+                                    I_EMPREGADOS, 
+                                    (SELECT MAX(I_FERIAS_GOZO) 
+                                    FROM BETHADBA.FOFERIAS_GOZO AS TABLE02 
+                                    WHERE TABLE01.CODI_EMP = TABLE02.CODI_EMP AND 
+                                            TABLE01.I_EMPREGADOS = TABLE02.I_EMPREGADOS)
+                            FROM BETHADBA.FOFERIAS_GOZO AS TABLE01
+                            GROUP BY CODI_EMP, I_EMPREGADOS
+                            ORDER BY CODI_EMP, I_EMPREGADOS
+            """)
+            rows = cursor.fetchall()
+
+            result = {}
+            for row in rows:
+                if str(row[0]) not in result.keys():
+                    result[str(row[0])] = {}
+
+                if str(row[1]) not in result[str(row[0])].keys():
+                    result[str(row[0])][str(row[1])] = int(row[2])
+
+            return result
+
+        except:
+            return False
+
+    def select_users(self, connection, base_name):
+        cursor = connection.cursor()
+
+        try:
+            cursor.execute(f"SELECT i_confusuario FROM bethadba.usConfUsuario WHERE i_usuario like '{base_name}%'")
+            rows = cursor.fetchall()
+
+            result = []
+            for row in rows:
+                result.append(row[0])
+
+            return result
+
+        except:
+            return False

@@ -8,6 +8,13 @@ from dateutil.relativedelta import relativedelta
 import json
 import pandas as pd
 
+# Dados utilizados para conexão com o FTP
+FTP_HOST = 'ftp.dominiosistemas.com.br'
+FTP_USER = 'supuns'
+FTP_PASSWORD = '219a3bcb'
+FTP_ROOT_PATH = '/unidades/Pub/Conversores/Conversor_python'
+
+
 def print_to_import(output_file, data):
     """
     Recebe como parâmetro o arquivo de saída e um dicionário, e imprime os valores do dicionário em um arquivo txt
@@ -438,6 +445,7 @@ def format_name_rubric(name):
     new_name = f'CONV. {aux[0:34]}'
     return new_name
 
+
 def format_int(value, default_value_error=False, default_value=''):
     """
     Formatar valor para inteiro.
@@ -452,3 +460,34 @@ def format_int(value, default_value_error=False, default_value=''):
             return default_value
         else:
             return False
+
+
+def order_dates(iterator_dates):
+    """
+    Ordena uma série de datas em sequencia
+    """
+    converted_dates = [convert_date(date, '%d/%m/%Y') for date in iterator_dates]
+    return sorted(converted_dates)
+
+
+def download_def_db():
+    """
+    Realiza o donwload de um banco SQLite que contém a DEF das tabelas
+    """
+    try:
+        ftp = ftplib.FTP(FTP_HOST)
+        ftp.login(FTP_USER, FTP_PASSWORD)
+        ftp.encoding = 'ANSI'
+        ftp.cwd(FTP_ROOT_PATH)
+
+        filenames = ftp.nlst()
+
+        for filename in filenames:
+            if 'def_tables.db' in filename:
+                with open('def_tables.db', 'wb' ) as db_file:
+                    ftp.retrbinary('RETR %s' % filename, db_file.write)
+
+        ftp.quit()
+        return True
+    except:
+        return False

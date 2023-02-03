@@ -1,11 +1,14 @@
 from PySide6.QtWidgets import QApplication, QMainWindow, QDialog
 from PyQt5 import QtCore, QtGui, QtWidgets
-from src.esocial import eSocialXML
-from src.ui.esocial_unico import Ui_MainWindow as Interface
-from src.ui.dialog_configuaracoes import Ui_dialog_configuracioes as DialogConfiguracoes
 from sqlalchemy import create_engine, Table, update
 import pandas as pd
 import os, json, sys
+
+from src.ui.esocial_unico import Ui_MainWindow as Interface
+from src.ui.dialog_configuaracoes import Ui_dialog_configuracioes as DialogConfiguracoes
+
+from src.esocial import eSocialXML
+from src.rpa.rpa import RPA
 
 
 class eSocial(QtWidgets.QMainWindow):
@@ -311,7 +314,22 @@ class eSocial(QtWidgets.QMainWindow):
         esocial.save_rescission(inscricao, codi_emp, relacao_empregados)
         esocial.save_vacation(data_vacation)
 
-        self.atualiza_status("Função RPA não configurada")
+        # Iniciar RPA
+        local = False
+        machines = ['localhost']
+        rpa = RPA(f"{self.__diretorio_trabalho}\\{inscricao}\\rpa", 'esocial', 'EXTERNO', '123456', 'sgd_user', 'sgd_pass')
+
+        # validar se nenhum ponto cadastral pode interferir nos cálculos
+        if rpa.invalid_cadastral_conversion():
+            print('parte cadastral inválida')
+            return False
+        #
+        rpa.prepare(codi_emp, '01/2022', '01/2023')
+        rpa.prepare_machines_for_calc(local, machines)
+        # rpa.start()
+
+        self.atualiza_status("Cálculo finalizado")
+        print('terminou')
 
 
 class eSocialConfiguracoes(QtWidgets.QDialog):
