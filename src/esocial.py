@@ -1892,3 +1892,15 @@ def load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_ru
 
             i_eventos_importation = general_rubrics_relationship.get(i_eventos)
             rubrics_relationship.add(i_eventos_importation, [str(codi_emp_eve), str(i_eventos)])
+
+
+def get_codi_emp(engine, inscricao):
+    """
+    Recupera o código de uma empresa com base em sua inscrição
+    """
+    codi_emp = ''
+    df = pd.read_sql(f'SELECT codi_emp FROM EMPRESAS WHERE inscricao = {inscricao}', con=engine)
+    for index in range(len(df)):
+        codi_emp = df.loc[index, "codi_emp"]
+
+    return codi_emp

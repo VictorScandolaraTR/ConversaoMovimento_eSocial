@@ -8,6 +8,7 @@ from src.ui.esocial_unico import Ui_MainWindow as Interface
 from src.ui.dialog_configuaracoes import Ui_dialog_configuracioes as DialogConfiguracoes
 
 from src.esocial import eSocialXML
+from src.esocial import get_codi_emp
 from src.rpa.rpa import RPA
 
 
@@ -299,7 +300,8 @@ class eSocial(QtWidgets.QMainWindow):
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
 
         esocial = eSocialXML(f"{self.__diretorio_trabalho}\\{inscricao}")
-        codi_emp = '1'
+        codi_emp = get_codi_emp(self.__engine, inscricao)
+
         relacao_empregados = esocial.relaciona_empregados()
 
         # gerar arquivos cadastrais
