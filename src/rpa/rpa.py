@@ -90,20 +90,19 @@ class RPA:
         """
         Se conecta com os agentes nas máquinas que irão ser utilizadas para cálculo
         """
-        # Thread(target=self.init_server_communication).start()
-        #
-        # if local_run:
-        #     Thread(target=self.init_local_agent).start()
-        #
-        # self.await_connections(local_run, machines)
-        #
-        # # Fica verificando novas conexões
-        # Thread(target=self.await_new_connections).start()
+        Thread(target=self.init_server_communication).start()
 
-        # if machines:
-        if True:
+        if local_run:
+            Thread(target=self.init_local_agent).start()
+
+        self.await_connections(local_run, machines)
+
+        # Fica verificando novas conexões
+        Thread(target=self.await_new_connections).start()
+
+        if machines:
             self.compact_data_calc()
-            # self.send_data(machines)
+            self.send_data(machines)
 
     def compact_data_calc(self):
         """
@@ -246,7 +245,6 @@ class RPA:
             ignore_companies = check_companies_calc(self.__database, self.__username, self.__password)
             total_competences = 0
 
-            print(ignore_companies, self.__companies_calc)
             # dados de holerites
             data = Table('FOLANCAMENTOS_EVENTOS', file=f'{self.__conversion_path}\\importar\\FOLANCAMENTOS_EVENTOS.txt')
             for item in data.items():
@@ -293,7 +291,6 @@ class RPA:
 
             return total_competences
         except Exception as e:
-            print(e)
             self.print_in_log(error=str(e))
 
     def await_connections(self, local_run, machines):
@@ -309,41 +306,39 @@ class RPA:
         # e aqui dividimos os 65% pelo numero de competências a serem calculadas
         self.current_percent = 25
         total_competences = self.read_competences()
-        print(total_competences)
-        # self.sum_percent = (65 / total_competences)
-        #
-        # # etapas de importação
-        # self.__init_create_users = False
-        # self.__users_to_create = total_stations
-        # self.__end_create_users = False
-        # self.__init_import_events = False
-        # self.__end_import_events = False
-        # self.__init_import_removals = False
-        # self.__end_import_removals = False
-        # self.__init_import_vacation = False
-        # self.__end_import_vacation = False
-        # self.__init_calc = False
-        # self.__companies_calc_finished = []
-        # self.__init_finish_process = False
-        # self.__end_finish_process = False
-        #
-        # self.__user_connection = {}
-        # connections = 0
-        # try:
-        #     while connections < total_stations:
-        #         if self.__init_server:
-        #             try:
-        #                 client, address = self.server.accept()
-        #                 self.__user_connection[address[0]] = False
-        #                 connections += 1
-        #                 Thread(target=self.handle_client, args=(client, address[0])).start()
-        #             except Exception as e:
-        #                 print(e)
-        #                 self.print_in_log(error=str(e))
-        #
-        # except Exception as e:
-        #     self.print_in_log(error=str(e))
-        #     return False
+        self.sum_percent = (65 / total_competences)
+
+        # etapas de importação
+        self.__init_create_users = False
+        self.__users_to_create = total_stations
+        self.__end_create_users = False
+        self.__init_import_events = False
+        self.__end_import_events = False
+        self.__init_import_removals = False
+        self.__end_import_removals = False
+        self.__init_import_vacation = False
+        self.__end_import_vacation = False
+        self.__init_calc = False
+        self.__companies_calc_finished = []
+        self.__init_finish_process = False
+        self.__end_finish_process = False
+
+        self.__user_connection = {}
+        connections = 0
+        try:
+            while connections < total_stations:
+                if self.__init_server:
+                    try:
+                        client, address = self.server.accept()
+                        self.__user_connection[address[0]] = False
+                        connections += 1
+                        Thread(target=self.handle_client, args=(client, address[0])).start()
+                    except Exception as e:
+                        self.print_in_log(error=str(e))
+
+        except Exception as e:
+            self.print_in_log(error=str(e))
+            return False
 
     def await_new_connections(self):
         """

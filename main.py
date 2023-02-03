@@ -6,6 +6,7 @@ import os, json, sys
 
 from src.ui.esocial_unico import Ui_MainWindow as Interface
 from src.ui.dialog_configuaracoes import Ui_dialog_configuracioes as DialogConfiguracoes
+from src.classes.RPAConfiguracoes import RPAConfiguracoes
 
 from src.esocial import eSocialXML
 from src.esocial import get_codi_emp
@@ -367,13 +368,6 @@ class eSocial(QMainWindow):
         self.seleciona_registro()
 
     def executar_rpa(self):
-        indice = str(self.__tabela_empresas.selectedItems()[0].row())
-        base_dominio = self.__empresas[indice]["base_dominio"]
-        usuario_dominio = self.__empresas[indice]["usuario_dominio"]
-        senha_dominio = self.__empresas[indice]["senha_dominio"]
-        usuario_sgd = self.__empresas[indice]["usuario_sgd"]
-        senha_sgd = self.__empresas[indice]["senha_sgd"]
-
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
 
         esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
@@ -394,8 +388,22 @@ class eSocial(QMainWindow):
         esocial.save_vacation(data_vacation)
 
         # Iniciar RPA
-        local = False
-        machines = ['localhost']
+        self.__dialog = RPAConfiguracoes()
+        self.__dialog.init_gui()
+        self.__dialog.config_run.connect(self.iniciar_rpa)
+
+
+    def iniciar_rpa(self, local, machines):
+        inscricao = self.__tabela_empresas.selectedItems()[0].text()
+        indice = str(self.__tabela_empresas.selectedItems()[0].row())
+
+        codi_emp = str(get_codi_emp(self.__engine, inscricao))
+        base_dominio = self.__empresas[indice]["base_dominio"]
+        usuario_dominio = self.__empresas[indice]["usuario_dominio"]
+        senha_dominio = self.__empresas[indice]["senha_dominio"]
+        usuario_sgd = self.__empresas[indice]["usuario_sgd"]
+        senha_sgd = self.__empresas[indice]["senha_sgd"]
+
         rpa = RPA(f"{self.__diretorio_trabalho}\\{inscricao}\\rpa", base_dominio, usuario_dominio, senha_dominio, usuario_sgd, senha_sgd)
 
         # validar se nenhum ponto cadastral pode interferir nos cálculos
