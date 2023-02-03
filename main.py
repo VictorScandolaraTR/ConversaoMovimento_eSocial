@@ -1,5 +1,5 @@
-from PySide6.QtWidgets import QApplication, QMainWindow, QDialog
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PySide6.QtWidgets import QApplication, QMainWindow, QDialog, QTableWidgetItem
+from PySide6.QtCore import Signal, QThread
 from sqlalchemy import create_engine, Table, update
 import pandas as pd
 import os, json, sys
@@ -12,7 +12,7 @@ from src.esocial import get_codi_emp
 from src.rpa.rpa import RPA
 
 
-class eSocial(QtWidgets.QMainWindow):
+class eSocial(QMainWindow):
     def __init__(self):
         super().__init__()
         self.__window = Interface()
@@ -99,12 +99,9 @@ class eSocial(QtWidgets.QMainWindow):
 
             linha = 0
             while linha < quantidade_empresas:
-                self.__tabela_empresas.setItem(linha, 0, QtWidgets.QTableWidgetItem(
-                    self.__empresas.get(str(linha)).get("inscricao")))
-                self.__tabela_empresas.setItem(linha, 1, QtWidgets.QTableWidgetItem(
-                    self.__empresas.get(str(linha)).get("codi_emp")))
-                self.__tabela_empresas.setItem(linha, 2, QtWidgets.QTableWidgetItem(
-                    self.__empresas.get(str(linha)).get("nome_emp")))
+                self.__tabela_empresas.setItem(linha, 0, QTableWidgetItem(self.__empresas.get(str(linha)).get("inscricao")))
+                self.__tabela_empresas.setItem(linha, 1, QTableWidgetItem(str(self.__empresas.get(str(linha)).get("codi_emp"))))
+                self.__tabela_empresas.setItem(linha, 2, QTableWidgetItem(self.__empresas.get(str(linha)).get("nome_emp")))
 
                 status = self.__empresas.get(str(linha)).get("status")
 
@@ -118,7 +115,7 @@ class eSocial(QtWidgets.QMainWindow):
                     case "R":
                         status = "Processo concluído"
 
-                self.__tabela_empresas.setItem(linha, 3, QtWidgets.QTableWidgetItem(status))
+                self.__tabela_empresas.setItem(linha, 3, QTableWidgetItem(status))
 
                 linha = linha + 1
 
@@ -185,8 +182,63 @@ class eSocial(QtWidgets.QMainWindow):
         self.atualiza_tabela_empresas()
 
     def configura_conexoes(self):
-        window = eSocialConfiguracoes()
-        window.init_gui()
+        indice = str(self.__tabela_empresas.selectedItems()[0].row())
+        configuracoes = {
+            "base_dominio": self.__empresas[indice]["base_dominio"],
+            "usuario_dominio": self.__empresas[indice]["usuario_dominio"],
+            "senha_dominio": self.__empresas[indice]["senha_dominio"],
+            "empresa_padrao_rubricas": self.__empresas[indice]["empresa_padrao_rubricas"],
+            "usuario_esocial": self.__empresas[indice]["usuario_esocial"],
+            "senha_esocial": self.__empresas[indice]["senha_esocial"],
+            "certificado_esocial": self.__empresas[indice]["certificado_esocial"],
+            "tipo_certificado_esocial": self.__empresas[indice]["tipo_certificado_esocial"],
+            "usuario_sgd": self.__empresas[indice]["usuario_sgd"],
+            "senha_sgd": self.__empresas[indice]["senha_sgd"]
+        }
+
+        self.__dialog = eSocialConfiguracoes()
+        self.__dialog.init_gui(configuracoes)
+        self.__dialog.config_run.connect(self.atualiza_configuracoes)
+
+    def atualiza_configuracoes(self, dados):
+        inscricao = self.__tabela_empresas.selectedItems()[0].text()
+
+        base_dominio = dados["base_dominio"]
+        usuario_dominio = dados["usuario_dominio"]
+        senha_dominio = dados["senha_dominio"]
+        empresa_padrao_rubricas = dados["empresa_padrao_rubricas"]
+        usuario_esocial = dados["usuario_esocial"]
+        senha_esocial = dados["senha_esocial"]
+        certificado_esocial = dados["certificado_esocial"]
+        tipo_certificado_esocial = dados["tipo_certificado_esocial"]
+        usuario_sgd = dados["usuario_sgd"]
+        senha_sgd = dados["senha_sgd"]
+
+        sql = "UPDATE EMPRESAS SET base_dominio = '{base_dominio}', usuario_dominio = '{usuario_dominio}',"\
+                "senha_dominio = '{senha_dominio}',"\
+                "empresa_padrao_rubricas = '{empresa_padrao_rubricas}',"\
+                "usuario_esocial = '{usuario_esocial}',"\
+                "senha_esocial = '{senha_esocial}',"\
+                "certificado_esocial = '{certificado_esocial}',"\
+                "tipo_certificado_esocial = '{tipo_certificado_esocial}',"\
+                "usuario_sgd = '{usuario_sgd}',"\
+                "senha_sgd = '{senha_sgd}' "\
+                "WHERE inscricao = '{inscricao}'"
+
+        conexao = self.__engine.connect()
+        conexao.execute(sql.format(
+            base_dominio = base_dominio,
+            usuario_dominio = usuario_dominio,
+            senha_dominio = senha_dominio,
+            empresa_padrao_rubricas = empresa_padrao_rubricas,
+            usuario_esocial = usuario_esocial,
+            senha_esocial = senha_esocial,
+            certificado_esocial = certificado_esocial,
+            tipo_certificado_esocial = tipo_certificado_esocial,
+            usuario_sgd = usuario_sgd,
+            senha_sgd = senha_sgd,
+            inscricao = inscricao
+        ))
 
     def seleciona_registro(self):
         indice = self.__tabela_empresas.selectedItems()[0].row()
@@ -238,14 +290,14 @@ class eSocial(QtWidgets.QMainWindow):
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
         indice = self.__tabela_empresas.selectedItems()[0].row()
 
-        if (status_bd != ""):
-            self.__empresas[str(indice)]["status"] = "E"
+        if(status_bd!=""):
+            self.__empresas[str(indice)]["status"] = status_bd
             conexao = self.__engine.connect()
             conexao.execute(f"UPDATE EMPRESAS SET status = '{status_bd}' WHERE inscricao = '{inscricao}'")
 
     def acessa_portal_esocial(self):
         self.atualiza_status("Buscando dados do e-Social...")
-        indice = self.__tabela_empresas.selectedItems()[0].row()
+        indice = str(self.__tabela_empresas.selectedItems()[0].row())
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
         esocial = eSocialXML(f"{self.__diretorio_trabalho}\\{inscricao}")
 
@@ -265,9 +317,15 @@ class eSocial(QtWidgets.QMainWindow):
 
     def relaciona_empresa_dominio(self):
         self.atualiza_status("Consultando banco de dados Domínio...")
+        indice = str(self.__tabela_empresas.selectedItems()[0].row())
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
+        base_dominio = self.__empresas[indice]["base_dominio"]
+        usuario_dominio = self.__empresas[indice]["usuario_dominio"]
+        senha_dominio = self.__empresas[indice]["senha_dominio"]
+        
         esocial = eSocialXML(f"{self.__diretorio_trabalho}\\{inscricao}")
-        esocial.configura_conexao_dominio("movto_esocial", "EXTERNO", "123456")
+        esocial.configura_conexao_dominio(base_dominio, usuario_dominio, senha_dominio)
+
         empresas = esocial.relaciona_empresas(str(self.__tabela_empresas.selectedItems()[0].text()))
         indice = self.__tabela_empresas.selectedItems()[0].row()
 
@@ -283,15 +341,27 @@ class eSocial(QtWidgets.QMainWindow):
             self.__empresas[str(indice)]["codi_emp"] = str(empresas[0]["codigo"])
             self.__empresas[str(indice)]["nome_emp"] = str(empresas[0]["nome"])
 
-        self.atualiza_status("Dados carregados do Domínio", "D")
+        conexao = self.__engine.connect()
+        conexao.execute("UPDATE EMPRESAS SET codi_emp = {codi_emp}, nome_emp = '{nome_emp}' "\
+                        "WHERE inscricao = '{inscricao}'".format(
+                            codi_emp = empresas[0]["codigo"],
+                            nome_emp = empresas[0]["nome"],
+                            inscricao = inscricao
+                        ))
+        self.atualiza_status("Dados carregados do Domínio","D")
         self.seleciona_registro()
 
     def relacionar_rubricas(self):
-        indice = self.__tabela_empresas.selectedItems()[0].row()
+        indice = str(self.__tabela_empresas.selectedItems()[0].row())
+        base_dominio = self.__empresas[indice]["base_dominio"]
+        usuario_dominio = self.__empresas[indice]["usuario_dominio"]
+        senha_dominio = self.__empresas[indice]["senha_dominio"]
         self.atualiza_status("Gerando planilha de relações de rubricas...")
+
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
         esocial = eSocialXML(f"{self.__diretorio_trabalho}\\{inscricao}")
         esocial.carregar_informacoes_xml()
+        esocial.configura_conexao_dominio(base_dominio, usuario_dominio, senha_dominio)
         esocial.gera_excel_relacao(self.__tabela_empresas.selectedItems()[0].text())
         self.atualiza_status("Planilha de rubricas geradas", "P")
         self.seleciona_registro()
@@ -334,22 +404,74 @@ class eSocial(QtWidgets.QMainWindow):
         print('terminou')
 
 
-class eSocialConfiguracoes(QtWidgets.QDialog):
+class eSocialConfiguracoes(QMainWindow):
+    config_run = Signal(dict)
+
     def __init__(self):
         super().__init__()
         self.__window = DialogConfiguracoes()
 
-    def init_gui(self):
+    def init_gui(self, configuracao):
         """
         Declarar componentes que serão utilizados da interface
         """
         self.__window.setupUi(self)
         self.setWindowTitle('Configuração de credenciais')
-        self.show()
 
+        self.__btn_cancelar = self.__window.btn_concertar_configuracoes
+        self.__btn_confirmar_configuracoes = self.__window.btn_confirmar_configuracoes
+
+        self.__edit_usuario_certificado = self.__window.edit_usuario_certificado
+        self.__edit_senha_certificado = self.__window.edit_senha_certificado
+        self.__combo_tipo_certificado = self.__window.combo_tipo_certificado
+        self.__edit_caminho_certificado = self.__window.edit_caminho_certificado
+
+        self.__edit_banco_dominio = self.__window.edit_banco_dominio
+        self.__edit_usuario_dominio = self.__window.edit_usuario_dominio
+        self.__edit_senha_dominio = self.__window.edit_senha_dominio
+        self.__edit_empresa_rubricas_dominio = self.__window.edit_empresa_rubricas_dominio
+        
+        self.__edit_usuario_sgd = self.__window.edit_usuario_sgd
+        self.__edit_senha_sgd = self.__window.edit_senha_sgd
+
+        self.__btn_cancelar.clicked.connect(self.close)
+        self.__btn_confirmar_configuracoes.clicked.connect(self.salvar)
+
+        print(configuracao)
+        self.__edit_usuario_certificado.setText(configuracao["usuario_esocial"])
+        self.__edit_senha_certificado.setText(configuracao["senha_esocial"])
+        self.__combo_tipo_certificado.setCurrentText(configuracao["tipo_certificado_esocial"])
+        self.__edit_caminho_certificado.setText(configuracao["certificado_esocial"])
+        self.__edit_banco_dominio.setText(configuracao["base_dominio"])
+        self.__edit_usuario_dominio.setText(configuracao["usuario_dominio"])
+        self.__edit_senha_dominio.setText(configuracao["senha_dominio"])
+        self.__edit_empresa_rubricas_dominio.setText(configuracao["empresa_padrao_rubricas"])
+        self.__edit_usuario_sgd.setText(configuracao["usuario_sgd"])
+        self.__edit_senha_sgd.setText(configuracao["senha_sgd"])
+
+        self.show()
+    def busca_certificado(self):
+        pass
+
+    def salvar(self):
+        dados = {
+            "base_dominio": self.__edit_banco_dominio.text(),
+            "usuario_dominio": self.__edit_usuario_dominio.text(),
+            "senha_dominio": self.__edit_senha_dominio.text(),
+            "empresa_padrao_rubricas": self.__edit_empresa_rubricas_dominio.text(),
+            "usuario_esocial": self.__edit_usuario_certificado.text(),
+            "senha_esocial": self.__edit_senha_certificado.text(),
+            "certificado_esocial": self.__edit_caminho_certificado.text(),
+            "tipo_certificado_esocial": self.__combo_tipo_certificado.currentText(),
+            "usuario_sgd": self.__edit_usuario_sgd.text(),
+            "senha_sgd": self.__edit_senha_sgd.text()
+        }
+        
+        self.config_run.emit(dados)
+        self.close()
 
 if __name__ == '__main__':
-    app = QtWidgets.QApplication([])
+    app = QApplication([])
     window = eSocial()
     window.init_gui()
     app.exec()
