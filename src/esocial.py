@@ -14,14 +14,16 @@ from src.database.data_rubrics import *
 from src.database.depara import *
 
 class eSocialXML():
-    def __init__(self, diretorio_xml):
-        self.DIRETORIO_RAIZ = diretorio_xml
-        self.DIRETORIO_XML = f"{diretorio_xml}\\eventos"
-        self.DIRETORIO_DOWNLOADS = f"{diretorio_xml}\\downloads"
-        self.DIRETORIO_SAIDA = f"{diretorio_xml}\\saida"
-        self.DIRETORIO_RPA = f"{diretorio_xml}\\rpa"
-        self.DIRETORIO_IMPORTAR = f"{diretorio_xml}\\rpa\\Importar"
-        self.BANCO_SQLITE = f"{diretorio_xml}\\rpa\\query.db"
+    def __init__(self, diretorio_trabalho, inscricao):
+        self.__inscricao = inscricao
+        self.DIRETORIO_TRABALHO = f'{diretorio_trabalho}\\{inscricao}'
+        self.DIRETORIO_RAIZ = self.DIRETORIO_TRABALHO
+        self.DIRETORIO_XML = f"{self.DIRETORIO_TRABALHO}\\eventos"
+        self.DIRETORIO_DOWNLOADS = f"{self.DIRETORIO_TRABALHO}\\downloads"
+        self.DIRETORIO_SAIDA = f"{self.DIRETORIO_TRABALHO}\\saida"
+        self.DIRETORIO_RPA = f"{self.DIRETORIO_TRABALHO}\\rpa"
+        self.DIRETORIO_IMPORTAR = f"{self.DIRETORIO_TRABALHO}\\rpa\\Importar"
+        self.BANCO_SQLITE = f"{self.DIRETORIO_TRABALHO}\\rpa\\query.db"
         self.INIT_COMPETENCE = '01/01/2022'
         self.END_COMPETENCE = '01/01/2023'
 
@@ -35,17 +37,7 @@ class eSocialXML():
         self.dicionario_s2399 = {} # Demissão (contribuintes)
 
         # Parâmetros de operação
-        try:
-            self.carrega_parametros()
-        except:
-            self.base_dominio = "Contabil"
-            self.usuario_dominio = "EXTERNO"
-            self.senha_dominio = "123456"
-            self.empresa_padrao_rubricas = "9999"
-            self.usuario_esocial = ""
-            self.senha_esocial = ""
-            self.certificado_esocial = ""
-            self.tipo_certificado_esocial = "A1"
+        self.carrega_parametros()
 
         # cria as pastas necessárias
         create_folder(self.DIRETORIO_XML)
@@ -54,22 +46,24 @@ class eSocialXML():
         create_folder(self.DIRETORIO_IMPORTAR)
 
     def carrega_parametros(self):
-        '''Carrega os parâmetros utilizados do arquivo parametros.json'''
+        """
+        Carrega os parametros utilizados do banco SQLite
+        """
+        diretorio_config_database = os.path.dirname(self.DIRETORIO_RAIZ)
+        engine = create_engine(f"sqlite:///{diretorio_config_database}/operacao.db")
 
-        f = open(f"{self.DIRETORIO_RAIZ}\\parametros.json","r")
-        parametros_texto = f.readline()
-        f.close
-
-        parametros = json.loads(parametros_texto)
-
-        self.base_dominio = parametros["base_dominio"]
-        self.usuario_dominio = parametros["usuario_dominio"]
-        self.senha_dominio = parametros["senha_dominio"]
-        self.empresa_padrao_rubricas = parametros["empresa_padrao_rubricas"]
-        self.usuario_esocial = parametros["usuario_esocial"]
-        self.senha_esocial = parametros["senha_dominio"]
-        self.certificado_esocial = parametros["certificado_esocial"]
-        self.tipo_certificado_esocial = parametros["tipo_certificado_esocial"]
+        df = pd.read_sql(f'SELECT * FROM EMPRESAS WHERE inscricao = {self.__inscricao}', con=engine)
+        for index in range(len(df)):
+            self.base_dominio = df.loc[index, "base_dominio"]
+            self.usuario_dominio = df.loc[index, "usuario_dominio"]
+            self.senha_dominio = df.loc[index, "senha_dominio"]
+            self.empresa_padrao_rubricas = df.loc[index, "empresa_padrao_rubricas"]
+            self.usuario_esocial = df.loc[index, "usuario_esocial"]
+            self.senha_esocial = df.loc[index, "senha_esocial"]
+            self.certificado_esocial = df.loc[index, "certificado_esocial"]
+            self.tipo_certificado_esocial = df.loc[index, "tipo_certificado_esocial"]
+            self.usuario_sgd = df.loc[index, "usuario_sgd"]
+            self.senha_sgd = df.loc[index, "senha_sgd"]
 
     def salvar_parametros(self):
         '''Salva os parâmetros utilizados no arquivo parametros.json'''

@@ -299,7 +299,7 @@ class eSocial(QMainWindow):
         self.atualiza_status("Buscando dados do e-Social...")
         indice = str(self.__tabela_empresas.selectedItems()[0].row())
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
-        esocial = eSocialXML(f"{self.__diretorio_trabalho}\\{inscricao}")
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
 
         usuario = self.__empresas.get(indice).get("usuario_esocial")
         senha = self.__empresas.get(indice).get("senha_esocial")
@@ -323,7 +323,7 @@ class eSocial(QMainWindow):
         usuario_dominio = self.__empresas[indice]["usuario_dominio"]
         senha_dominio = self.__empresas[indice]["senha_dominio"]
         
-        esocial = eSocialXML(f"{self.__diretorio_trabalho}\\{inscricao}")
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
         esocial.configura_conexao_dominio(base_dominio, usuario_dominio, senha_dominio)
 
         empresas = esocial.relaciona_empresas(str(self.__tabela_empresas.selectedItems()[0].text()))
@@ -359,7 +359,7 @@ class eSocial(QMainWindow):
         self.atualiza_status("Gerando planilha de relações de rubricas...")
 
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
-        esocial = eSocialXML(f"{self.__diretorio_trabalho}\\{inscricao}")
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
         esocial.carregar_informacoes_xml()
         esocial.configura_conexao_dominio(base_dominio, usuario_dominio, senha_dominio)
         esocial.gera_excel_relacao(self.__tabela_empresas.selectedItems()[0].text())
@@ -367,10 +367,17 @@ class eSocial(QMainWindow):
         self.seleciona_registro()
 
     def executar_rpa(self):
+        indice = str(self.__tabela_empresas.selectedItems()[0].row())
+        base_dominio = self.__empresas[indice]["base_dominio"]
+        usuario_dominio = self.__empresas[indice]["usuario_dominio"]
+        senha_dominio = self.__empresas[indice]["senha_dominio"]
+        usuario_sgd = self.__empresas[indice]["usuario_sgd"]
+        senha_sgd = self.__empresas[indice]["senha_sgd"]
+
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
 
-        esocial = eSocialXML(f"{self.__diretorio_trabalho}\\{inscricao}")
-        codi_emp = get_codi_emp(self.__engine, inscricao)
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
+        codi_emp = str(get_codi_emp(self.__engine, inscricao))
 
         relacao_empregados = esocial.relaciona_empregados()
 
@@ -389,7 +396,7 @@ class eSocial(QMainWindow):
         # Iniciar RPA
         local = False
         machines = ['localhost']
-        rpa = RPA(f"{self.__diretorio_trabalho}\\{inscricao}\\rpa", 'esocial', 'EXTERNO', '123456', 'sgd_user', 'sgd_pass')
+        rpa = RPA(f"{self.__diretorio_trabalho}\\{inscricao}\\rpa", base_dominio, usuario_dominio, senha_dominio, usuario_sgd, senha_sgd)
 
         # validar se nenhum ponto cadastral pode interferir nos cálculos
         if rpa.invalid_cadastral_conversion():
@@ -469,6 +476,7 @@ class eSocialConfiguracoes(QMainWindow):
         
         self.config_run.emit(dados)
         self.close()
+
 
 if __name__ == '__main__':
     app = QApplication([])
