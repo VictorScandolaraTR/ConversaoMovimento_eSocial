@@ -19,8 +19,9 @@ class eSocialXML():
         self.DIRETORIO_XML = f"{diretorio_xml}\\eventos"
         self.DIRETORIO_DOWNLOADS = f"{diretorio_xml}\\downloads"
         self.DIRETORIO_SAIDA = f"{diretorio_xml}\\saida"
-        self.DIRETORIO_IMPORTAR = f"{diretorio_xml}\\rpa\\importar"
-        self.BANCO_SQLITE = f"{diretorio_xml}\\rpa\\temp.db"
+        self.DIRETORIO_RPA = f"{diretorio_xml}\\rpa"
+        self.DIRETORIO_IMPORTAR = f"{diretorio_xml}\\rpa\\Importar"
+        self.BANCO_SQLITE = f"{diretorio_xml}\\rpa\\query.db"
         self.INIT_COMPETENCE = '01/01/2022'
         self.END_COMPETENCE = '01/01/2023'
 
@@ -45,6 +46,12 @@ class eSocialXML():
             self.senha_esocial = ""
             self.certificado_esocial = ""
             self.tipo_certificado_esocial = "A1"
+
+        # cria as pastas necessárias
+        create_folder(self.DIRETORIO_XML)
+        create_folder(self.DIRETORIO_DOWNLOADS)
+        create_folder(self.DIRETORIO_RPA)
+        create_folder(self.DIRETORIO_IMPORTAR)
 
     def carrega_parametros(self):
         '''Carrega os parâmetros utilizados do arquivo parametros.json'''

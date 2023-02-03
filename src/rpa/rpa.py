@@ -1,11 +1,11 @@
 import logging
-from os import mkdir
-from os.path import isfile, isdir
-from shutil import copy, move, make_archive, rmtree, copytree
+from os.path import isfile
+from shutil import copy, move, make_archive, copytree
 import socket
 from threading import Thread
 import multiprocessing
 from time import sleep
+import json
 
 from src.rpa.agent import Agent
 from src.database.Sybase import Sybase
@@ -53,20 +53,12 @@ class RPA:
 
         self.prepare_data_calc()
 
-    def create_folder(self, name_folder):
-        """
-        Cria um diretório no caminho especificado
-        """
-        if isdir(name_folder):
-            rmtree(name_folder)
-        mkdir(name_folder)
-
     def prepare_data_calc(self):
         """
         Gera o arquivo de configuração para o RPA e organiza os dados que ele precisa
         para ser executado
         """
-        self.create_folder(f'{self.__conversion_path}\\prontos')
+        create_folder(f'{self.__conversion_path}\\prontos', clean_path=True)
 
         # cria um arquivo de configuração para o RPA
         config_data = {
@@ -117,11 +109,10 @@ class RPA:
         """
         Compacta os dados necessários no calculo para serem enviados para as máquinas na rede
         """
-        path_zip = self.__conversion_path.replace('rpa', '')
         if isfile(f'{self.__conversion_path}\\send_data.zip'):
             remove(f'{self.__conversion_path}\\send_data.zip')
 
-        make_archive('send_data', 'zip', path_zip)
+        make_archive('send_data', 'zip', self.__conversion_path)
         move('send_data.zip', self.__conversion_path)
 
     def send_data(self, machines):

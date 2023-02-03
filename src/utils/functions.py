@@ -1,12 +1,10 @@
-from os import replace, remove, system
-import re
-import tempfile
-import shutil
-import chardet
+from os import remove, mkdir
+from os.path import isdir
+from shutil import rmtree
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-import json
 import pandas as pd
+import ftplib
 
 # Dados utilizados para conexão com o FTP
 FTP_HOST = 'ftp.dominiosistemas.com.br'
@@ -491,3 +489,15 @@ def download_def_db():
         return True
     except:
         return False
+
+
+def create_folder(name_folder, clean_path=False):
+    """
+    Cria um diretório no caminho especificado
+    :clean_path -> Limpa o caminho especificado se ele existir
+    """
+    if clean_path and isdir(name_folder):
+        rmtree(name_folder)
+
+    if not isdir(name_folder):
+        mkdir(name_folder)
