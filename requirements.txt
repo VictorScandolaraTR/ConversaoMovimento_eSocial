@@ -7,3 +7,4 @@ python-dateutil
 sqlalchemy
 sqlalchemy-sybase
 peewee
+autoit
