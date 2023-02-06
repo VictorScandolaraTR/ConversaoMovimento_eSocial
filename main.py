@@ -1,12 +1,19 @@
 from PySide6.QtWidgets import QApplication, QMainWindow, QDialog, QTableWidgetItem
 from PySide6.QtCore import Signal, QThread
-from src.esocial import eSocialXML
-from src.ui.esocial_unico import Ui_MainWindow as Interface
-from src.ui.dialog_configuaracoes import Ui_dialog_configuracioes as DialogConfiguracoes
 from sqlalchemy import create_engine, Table, update
 import src.utils.components as components
 import pandas as pd
 import os, json, sys
+
+from src.ui.esocial_unico import Ui_MainWindow as Interface
+from src.ui.dialog_configuaracoes import Ui_dialog_configuracioes as DialogConfiguracoes
+from src.classes.RPAConfiguracoes import RPAConfiguracoes
+
+from src.esocial import eSocialXML
+from src.esocial import get_codi_emp
+from src.rpa.rpa import RPA
+import src.ui.components_ui as components_ui
+
 
 class eSocial(QMainWindow):
     def __init__(self):
@@ -15,12 +22,13 @@ class eSocial(QMainWindow):
         self.__diretorio_trabalho = "xml"
         self.__engine = create_engine(f"sqlite:///{self.__diretorio_trabalho}/operacao.db")
         self.__empresas, self.__empresas_em_uso = self.carrega_empresas()
-    
+
     def init_gui(self):
         """
         Declarar componentes que serão utilizados da interface
         """
         self.__window.setupUi(self)
+        self.__widget = self.__window.centralwidget
         self.setWindowTitle('Conversão de Movimentos - e-Social')
 
         self.__tabela_empresas = self.__window.tableWidget
@@ -33,8 +41,8 @@ class eSocial(QMainWindow):
         self.__btn_executa_rpa = self.__window.btn_executa_rpa
         self.__btn_excluir = self.__window.btn_excluir
 
-        self.__tabela_empresas.setColumnWidth(2,344)
-        self.__tabela_empresas.setColumnWidth(3,200)
+        self.__tabela_empresas.setColumnWidth(2, 344)
+        self.__tabela_empresas.setColumnWidth(3, 200)
 
         self.__tabela_empresas.clicked.connect(self.seleciona_registro)
         self.__btn_adiciona_empresa.clicked.connect(self.adiciona_empresa)
@@ -56,28 +64,28 @@ class eSocial(QMainWindow):
         self.show()
 
     def carrega_empresas(self):
-        df = pd.read_sql("SELECT * FROM EMPRESAS",con=self.__engine)
-        
+        df = pd.read_sql("SELECT * FROM EMPRESAS", con=self.__engine)
+
         empresas = {}
 
         for i in range(len(df)):
             empresas[str(i)] = {
-                "inscricao": df.loc[i,"inscricao"],
-                "codi_emp": df.loc[i,"codi_emp"],
-                "nome_emp": df.loc[i,"nome_emp"],
-                "status": df.loc[i,"status"],
-                "base_dominio": df.loc[i,"base_dominio"],
-                "usuario_dominio": df.loc[i,"usuario_dominio"],
-                "senha_dominio": df.loc[i,"senha_dominio"],
-                "empresa_padrao_rubricas": df.loc[i,"empresa_padrao_rubricas"],
-                "usuario_esocial": df.loc[i,"usuario_esocial"],
-                "senha_esocial": df.loc[i,"senha_esocial"],
-                "certificado_esocial": df.loc[i,"certificado_esocial"],
-                "tipo_certificado_esocial": df.loc[i,"tipo_certificado_esocial"],
-                "usuario_sgd": df.loc[i,"usuario_sgd"],
-                "senha_sgd": df.loc[i,"senha_sgd"]
+                "inscricao": df.loc[i, "inscricao"],
+                "codi_emp": df.loc[i, "codi_emp"],
+                "nome_emp": df.loc[i, "nome_emp"],
+                "status": df.loc[i, "status"],
+                "base_dominio": df.loc[i, "base_dominio"],
+                "usuario_dominio": df.loc[i, "usuario_dominio"],
+                "senha_dominio": df.loc[i, "senha_dominio"],
+                "empresa_padrao_rubricas": df.loc[i, "empresa_padrao_rubricas"],
+                "usuario_esocial": df.loc[i, "usuario_esocial"],
+                "senha_esocial": df.loc[i, "senha_esocial"],
+                "certificado_esocial": df.loc[i, "certificado_esocial"],
+                "tipo_certificado_esocial": df.loc[i, "tipo_certificado_esocial"],
+                "usuario_sgd": df.loc[i, "usuario_sgd"],
+                "senha_sgd": df.loc[i, "senha_sgd"]
             }
-            
+
         empresas_em_uso = []
 
         for i in empresas:
@@ -88,7 +96,7 @@ class eSocial(QMainWindow):
     def atualiza_tabela_empresas(self):
         quantidade_empresas = len(self.__empresas)
 
-        if (quantidade_empresas==0):
+        if (quantidade_empresas == 0):
             return
         else:
             self.__tabela_empresas.setRowCount(quantidade_empresas)
@@ -114,19 +122,19 @@ class eSocial(QMainWindow):
                 self.__tabela_empresas.setItem(linha, 3, QTableWidgetItem(status))
 
                 linha = linha + 1
-    
+
     def adiciona_empresa(self):
         os.system(f"mkdir {self.__diretorio_trabalho}")
         proxima_linha = len(self.__empresas)
         inscricao = self.__edit_inscricao.text()
 
-        if(inscricao==""):
+        if (inscricao == ""):
             print("Preencha o campo inscrição.")
             return
-        if(inscricao in self.__empresas_em_uso):
+        if (inscricao in self.__empresas_em_uso):
             print("Empresa já cadastrada.")
             return
-        
+
         os.system(f"mkdir {self.__diretorio_trabalho}\\{inscricao}")
         os.system(f"mkdir {self.__diretorio_trabalho}\\{inscricao}\\downloads")
         os.system(f"mkdir {self.__diretorio_trabalho}\\{inscricao}\\eventos")
@@ -154,7 +162,7 @@ class eSocial(QMainWindow):
         }
 
         self.__empresas_em_uso.append(inscricao)
-        
+
         self.__edit_inscricao.setText("")
         self.atualiza_tabela_empresas()
 
@@ -173,7 +181,7 @@ class eSocial(QMainWindow):
         os.system(f"rmdir {self.__diretorio_trabalho}\\{inscricao}\\eventos")
         os.system(f"rmdir {self.__diretorio_trabalho}\\{inscricao}\\importar")
         os.system(f"rmdir {self.__diretorio_trabalho}\\{inscricao}")
-        
+
         self.__empresas, self.__empresas_em_uso = self.carrega_empresas()
         self.atualiza_tabela_empresas()
 
@@ -235,13 +243,13 @@ class eSocial(QMainWindow):
             senha_sgd = senha_sgd,
             inscricao = inscricao
         ))
-    
+
     def seleciona_registro(self):
         indice = self.__tabela_empresas.selectedItems()[0].row()
         status = self.__empresas[str(indice)]["status"]
 
         match status:
-            case ""|None:
+            case "" | None:
                 self.__btn_conexoes.setEnabled(True)
                 self.__btn_obtem_dados_esocial.setEnabled(True)
                 self.__btn_relaciona_empresas_dominio.setEnabled(True)
@@ -269,7 +277,7 @@ class eSocial(QMainWindow):
                 self.__btn_obtem_dados_esocial.setEnabled(True)
                 self.__btn_relaciona_empresas_dominio.setEnabled(True)
                 self.__btn_relacionar_rubricas.setEnabled(True)
-                self.__btn_executa_rpa.setEnabled(False)
+                self.__btn_executa_rpa.setEnabled(True)
                 self.__btn_excluir.setEnabled(True)
                 self.__tabela_empresas.selectedItems()[3].setText("Planilha de rubricas geradas")
             case "R":
@@ -281,7 +289,7 @@ class eSocial(QMainWindow):
                 self.__btn_excluir.setEnabled(True)
                 self.__tabela_empresas.selectedItems()[3].setText("Processo concluído")
 
-    def atualiza_status(self, status, status_bd = ""):
+    def atualiza_status(self, status, status_bd=""):
         self.__tabela_empresas.selectedItems()[3].setText(status)
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
         indice = self.__tabela_empresas.selectedItems()[0].row()
@@ -290,12 +298,12 @@ class eSocial(QMainWindow):
             self.__empresas[str(indice)]["status"] = status_bd
             conexao = self.__engine.connect()
             conexao.execute(f"UPDATE EMPRESAS SET status = '{status_bd}' WHERE inscricao = '{inscricao}'")
-    
+
     def acessa_portal_esocial(self):
         self.atualiza_status("Buscando dados do e-Social...")
         indice = str(self.__tabela_empresas.selectedItems()[0].row())
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
-        esocial = eSocialXML(f"{self.__diretorio_trabalho}\\{inscricao}")
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
 
         usuario = self.__empresas.get(indice).get("usuario_esocial")
         senha = self.__empresas.get(indice).get("senha_esocial")
@@ -311,6 +319,7 @@ class eSocial(QMainWindow):
         self.atualiza_status("Dados carregados do e-Social","E")
         self.seleciona_registro()'''
 
+
     def relaciona_empresa_dominio(self):
         self.atualiza_status("Consultando banco de dados Domínio...")
         indice = str(self.__tabela_empresas.selectedItems()[0].row())
@@ -319,12 +328,13 @@ class eSocial(QMainWindow):
         usuario_dominio = self.__empresas[indice]["usuario_dominio"]
         senha_dominio = self.__empresas[indice]["senha_dominio"]
         
-        esocial = eSocialXML(f"{self.__diretorio_trabalho}\\{inscricao}")
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
         esocial.configura_conexao_dominio(base_dominio, usuario_dominio, senha_dominio)
+
         empresas = esocial.relaciona_empresas(str(self.__tabela_empresas.selectedItems()[0].text()))
         indice = self.__tabela_empresas.selectedItems()[0].row()
 
-        if(len(empresas)==1):
+        if (len(empresas) == 1):
             self.__tabela_empresas.selectedItems()[1].setText(str(empresas[0]["codigo"]))
             self.__tabela_empresas.selectedItems()[2].setText(str(empresas[0]["nome"]))
             self.__empresas[str(indice)]["codi_emp"] = str(empresas[0]["codigo"])
@@ -336,7 +346,6 @@ class eSocial(QMainWindow):
             self.__empresas[str(indice)]["codi_emp"] = str(empresas[0]["codigo"])
             self.__empresas[str(indice)]["nome_emp"] = str(empresas[0]["nome"])
 
-        
         conexao = self.__engine.connect()
         conexao.execute("UPDATE EMPRESAS SET codi_emp = {codi_emp}, nome_emp = '{nome_emp}' "\
                         "WHERE inscricao = '{inscricao}'".format(
@@ -355,15 +364,87 @@ class eSocial(QMainWindow):
         self.atualiza_status("Gerando planilha de relações de rubricas...")
 
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
-        esocial = eSocialXML(f"{self.__diretorio_trabalho}\\{inscricao}")
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
         esocial.carregar_informacoes_xml()
         esocial.configura_conexao_dominio(base_dominio, usuario_dominio, senha_dominio)
         esocial.gera_excel_relacao(self.__tabela_empresas.selectedItems()[0].text())
-        self.atualiza_status("Planilha de rubricas geradas","P")
+        self.atualiza_status("Planilha de rubricas geradas", "P")
         self.seleciona_registro()
 
     def executar_rpa(self):
-        self.atualiza_status("Função RPA não configurada")
+        inscricao = self.__tabela_empresas.selectedItems()[0].text()
+
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
+        codi_emp = str(get_codi_emp(self.__engine, inscricao))
+
+        relacao_empregados = esocial.relaciona_empregados()
+
+        # gerar arquivos cadastrais
+        esocial.carregar_informacoes_xml()
+        esocial.gerar_afastamentos_importacao(inscricao, codi_emp, relacao_empregados)
+        esocial.gerar_ferias_importacao(inscricao, codi_emp, relacao_empregados)
+
+        # gerar arquivos para importação de lançamentos
+        data_vacation = esocial.gerar_arquivos_saida(inscricao, codi_emp, relacao_empregados)
+
+        # gerar férias e rescisões que irão ser calculadas pelo RPA
+        esocial.save_rescission(inscricao, codi_emp, relacao_empregados)
+        esocial.save_vacation(data_vacation)
+
+        # Iniciar RPA
+        self.__dialog = RPAConfiguracoes()
+        self.__dialog.init_gui()
+        self.__dialog.config_run.connect(self.iniciar_rpa)
+
+    def iniciar_rpa(self, local, machines):
+        def finish_process(success, message):
+            print(success, 'ERROR:    ', message)
+            if success:
+                components_ui.message_sucess(self.__widget, 'Processo finalizado!')
+                self.set_progress('Processo completo...', 100)
+            else:
+                components_ui.message_error(self.__widget, message)
+                self.set_progress('Erro ao executar RPA...', 0)
+
+        def update_progress(progress):
+            self.set_progress(progress[0], progress[1])
+
+        inscricao = self.__tabela_empresas.selectedItems()[0].text()
+        indice = str(self.__tabela_empresas.selectedItems()[0].row())
+
+        codi_emp = str(get_codi_emp(self.__engine, inscricao))
+        base_dominio = self.__empresas[indice]["base_dominio"]
+        usuario_dominio = self.__empresas[indice]["usuario_dominio"]
+        senha_dominio = self.__empresas[indice]["senha_dominio"]
+        usuario_sgd = self.__empresas[indice]["usuario_sgd"]
+        senha_sgd = self.__empresas[indice]["senha_sgd"]
+
+        # Iniciar o RPA em uma Thread separada para não travar a interface
+        self.thread2 = QThread()
+        self.rpa = RPA()
+        self.rpa.init(f"{self.__diretorio_trabalho}\\{inscricao}\\rpa", base_dominio, usuario_dominio, senha_dominio, usuario_sgd, senha_sgd)
+
+        self.rpa.moveToThread(self.thread2)
+
+        # validar se nenhum ponto cadastral pode interferir nos cálculos
+        if self.rpa.invalid_cadastral_conversion():
+            print('parte cadastral inválida')
+            return False
+
+        self.rpa.prepare(codi_emp, '01/2022', '01/2023')
+        self.rpa.prepare_machines_for_calc(local, machines)
+
+        self.thread2.started.connect(self.rpa.start)
+        self.rpa.finished.connect(self.thread2.quit)
+        self.thread2.finished.connect(self.thread2.deleteLater)
+        self.thread2.start()
+
+        # vai recebendo sinais conforme avança o processamento
+        self.rpa.progress.connect(update_progress)
+        self.rpa.success.connect(finish_process)
+
+    def set_progress(self, text, percent):
+        print(f'ATUALIZACAO: {percent}%, {text}')
 
 class eSocialConfiguracoes(QMainWindow):
     config_run = Signal(dict)
@@ -371,7 +452,7 @@ class eSocialConfiguracoes(QMainWindow):
     def __init__(self):
         super().__init__()
         self.__window = DialogConfiguracoes()
-    
+
     def init_gui(self, configuracao):
         """
         Declarar componentes que serão utilizados da interface
@@ -414,7 +495,6 @@ class eSocialConfiguracoes(QMainWindow):
         self.__edit_senha_sgd.setText(configuracao["senha_sgd"])
 
         self.show()
-
     def busca_certificado(self):
         path = components.ask_file(self.__widget, 'Selecione o certificado.')
         self.__edit_caminho_certificado.setText(path)
@@ -435,6 +515,7 @@ class eSocialConfiguracoes(QMainWindow):
         
         self.config_run.emit(dados)
         self.close()
+
 
 if __name__ == '__main__':
     app = QApplication([])

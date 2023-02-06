@@ -1,11 +1,17 @@
-from os import replace, remove, system
-import re
-import tempfile
-import shutil
-import chardet
+from os import remove, mkdir
+from os.path import isdir
+from shutil import rmtree
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-import json
+import pandas as pd
+import ftplib
+
+# Dados utilizados para conexão com o FTP
+FTP_HOST = 'ftp.dominiosistemas.com.br'
+FTP_USER = 'supuns'
+FTP_PASSWORD = '219a3bcb'
+FTP_ROOT_PATH = '/unidades/Pub/Conversores/Conversor_python'
+
 
 def print_to_import(output_file, data):
     """
@@ -170,6 +176,20 @@ def is_null(field, check_int=False, date=False):
     return result
 
 
+def replace_day_date(str_date, date_format, day, default_value_error='NULO'):
+    """
+    Troca o dia de uma data para outro
+    """
+    try:
+        new_date = default_value_error
+        if not is_null(str_date):
+            date = convert_date(str_date, date_format)
+            new_date = (date.replace(day=day)).strftime("%d/%m/%Y")
+
+        return new_date
+    except:
+        return default_value_error
+
 def add_day_to_date(str_date, date_format, days, default_value_error='NULO'):
     """
     Adiciona dias(int) a uma string de data e retorna uma string no formato DD/MM/YYYY
@@ -184,22 +204,16 @@ def add_day_to_date(str_date, date_format, days, default_value_error='NULO'):
     except:
         return default_value_error
 
-
-def get_keys(key):
+def add_month_to_date(str_date, months, date_format, default_value_error='NULO'):
     """
-    Retorna valores do arquivo depara.json
+    Adiciona meses(int) a uma string de data no formato DD/MM/YYYY
+    Retorna uma string no formato DD/MM/YYYY
     """
-    with open('.\\src\\database\\depara.json') as file:
-        dicionario = json.load(file)
-
-    if str(key).upper() in dicionario.keys():
-        return dicionario[str(key).upper()]
-    elif str(key).lower() in dicionario.keys():
-        return dicionario[str(key).lower()]
-    elif str(key).capitalize() in dicionario.keys():
-        return dicionario[str(key).capitalize()]
-    else:
-        return False
+    try:
+        date = convert_date(str_date, date_format)
+        return (date + relativedelta(months=int(months))).strftime(date_format)
+    except:
+        return default_value_error
 
 
 def get_current_day():
@@ -252,3 +266,238 @@ def get_year(str_date):
     """
     year = str_date[:4]
     return year
+
+
+def read_rubric_relationship(file):
+    """
+    Recebe como parâmetro o arquivo excel que contém o relacionamento de eventos e retorna um dicionário
+    e uma lista, o dicionário contém o relacionamnto de rubricas e a lista contém as rubricas que devem ser geradas para importar
+    """
+    rubrics_relationship = {}
+    generate_rubrics = []
+    ignore_rubrics = []
+    base = pd.ExcelFile(file)
+
+    # Aba 'Relacionado' da planilha
+    try:
+        aux = pd.read_excel(base, 'Relacionado')
+        data_preset = trim_all_columns(aux)
+
+        # formatar cabeçalho, pois senão a query não funciona corretamente
+        data_preset.columns = format_header(data_preset.columns)
+
+        # cria um dataset para cada situação que pode ocorrer
+        # coleta as linhas que tem valor 'X' que significa relacionamento correto
+        data = data_preset.query(
+            'x_para_manter_o_relacionamento_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica == "X"')
+
+        # coleta as linhas que tem valor 'N' que significa para gerar essa rubrica para importação
+        data2 = data_preset.query(
+            'x_para_manter_o_relacionamento_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica == "N"')
+
+        # coleta as linhas que não tem nem 'X' nem 'N' que significa que fizeram um novo relacionamento de rúbrica
+        data3 = data_preset.query(
+            '(x_para_manter_o_relacionamento_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "X") & (x_para_manter_o_relacionamento_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "N")')
+
+        # adiciona na lista de relacionamentos
+        for row in data.to_dict(orient='records'):
+            rubrics_relationship[int(row['codigo'])] = row['codigo_dominio']
+
+        # adiciona na lista de rubricas para serem importadas
+        for row in data2.to_dict(orient='records'):
+            generate_rubrics.append(row)
+
+        # adiciona na lista de relacionamentos levando em conta o novo relacionamento feito manualmente
+        for row in data3.to_dict(orient='records'):
+            rubrics_relationship[int(row['codigo'])] = row[
+                'x_para_manter_o_relacionamento_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica']
+    except:
+        pass
+
+    # Aba '+ de 1 result.' da planilha
+    try:
+        aux = pd.read_excel(base, '+ de 1 result.')
+        data_preset = trim_all_columns(aux)
+
+        # formatar cabeçalho, pois senão a query não funciona corretamente
+        data_preset.columns = format_header(data_preset.columns)
+
+        # cria um dataset para cada situação que pode ocorrer
+        # coleta as linhas que tem valor 'N' que significa para gerar essa rubrica para importação
+        data = data_preset.query('informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica == "N"')
+
+        # coleta as linhas que não tem 'N' que significa que fizeram um novo relacionamento de rúbrica
+        data2 = data_preset.query('informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "N"')
+
+        # adiciona na lista de rubricas para serem importadas
+        for row in data.to_dict(orient='records'):
+            generate_rubrics.append(row)
+
+        # adiciona na lista de relacionamentos levando em conta o novo relacionamento feito manualmente
+        for row in data2.to_dict(orient='records'):
+            rubrics_relationship[int(row['codigo'])] = row[
+                'informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica']
+    except:
+        pass
+
+    # Aba 'Sem result.' da planilha
+    try:
+        aux = pd.read_excel(base, 'Sem result.')
+        data_preset = trim_all_columns(aux)
+
+        # formatar cabeçalho, pois senão a query não funciona corretamente
+        data_preset.columns = format_header(data_preset.columns)
+
+        # cria um dataset para cada situação que pode ocorrer
+        # coleta as linhas que tem valor 'N' que significa para gerar essa rubrica para importação
+        data = data_preset.query('informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica == "N"')
+
+        # coleta as linhas que não tem 'N' que significa que fizeram um novo relacionamento de rúbrica
+        data2 = data_preset.query('informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "N"')
+
+        # adiciona na lista de rubricas para serem importadas
+        for row in data.to_dict(orient='records'):
+            generate_rubrics.append(row)
+
+        # adiciona na lista de relacionamentos levando em conta o novo relacionamento feito manualmente
+        for row in data2.to_dict(orient='records'):
+            rubrics_relationship[int(row['codigo'])] = row[
+                'informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica']
+    except:
+        pass
+
+    # Aba 'Alerta' da planilha
+    try:
+        aux = pd.read_excel(base, 'Alerta')
+        data_preset = trim_all_columns(aux)
+
+        # formatar cabeçalho, pois senão a query não funciona corretamente
+        data_preset.columns = format_header(data_preset.columns)
+
+        # coleta as linhas que tem valor 'N' que significa para gerar essa rubrica para importação
+        data = data_preset.query(
+            'x_para_somar_as_rubricas_ou_d_para_desconsiderar_as_rubricas_duplicadas_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica == "N"')
+
+        # coleta as linhas que tem valor 'D' que significa para ignorar as linhas duplicadas
+        data2 = data_preset.query(
+            'x_para_somar_as_rubricas_ou_d_para_desconsiderar_as_rubricas_duplicadas_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica == "D"')
+
+        # coleta as linhas que não tem nem 'X' nem 'N' que significa que fizeram um novo relacionamento de rúbrica
+        data3 = data_preset.query(
+            '(x_para_somar_as_rubricas_ou_d_para_desconsiderar_as_rubricas_duplicadas_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "X") & (x_para_somar_as_rubricas_ou_d_para_desconsiderar_as_rubricas_duplicadas_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "N") & (x_para_somar_as_rubricas_ou_d_para_desconsiderar_as_rubricas_duplicadas_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica != "D")')
+
+        # adiciona na lista de rubricas para serem importadas
+        for row in data.to_dict(orient='records'):
+            generate_rubrics.append(row)
+
+        # adiciona na lista de rubricas para serem ignoradas se duplicarem
+        for row in data2.to_dict(orient='records'):
+            ignore_rubrics.append(int(row['codigo_dominio']))
+
+        # adiciona na lista de relacionamentos levando em conta o novo relacionamento feito manualmente
+        for row in data3.to_dict(orient='records'):
+            rubrics_relationship[int(row['codigo'])] = row[
+                'x_para_somar_as_rubricas_ou_d_para_desconsiderar_as_rubricas_duplicadas_ou_informe_a_rubrica_equivalente_ou_n_para_cadastrar_a_rubrica']
+    except:
+        pass
+
+    return rubrics_relationship, generate_rubrics, ignore_rubrics
+
+
+def trim_all_columns(df):
+    """
+    Trim whitespace from ends of each value across all series in dataframe
+    """
+    trim_strings = lambda x: x.strip() if isinstance(x, str) else x
+    return df.applymap(trim_strings)
+
+
+def format_header(columns):
+    """
+    Recebe o cabeçalho de uma planilha e retira alguns caracteres indesejados
+    """
+    new_columns = []
+    new_columns = [column.replace(' ', '_') for column in columns]
+    new_columns = [column.replace('-', '_') for column in new_columns]
+    new_columns = [column.replace('"', '') for column in new_columns]
+    new_columns = [column.lower() for column in new_columns]
+    new_columns = [column.replace('í', 'i') for column in new_columns]
+    new_columns = [column.replace('ó', 'o') for column in new_columns]
+    new_columns = [column.replace('ú', 'u') for column in new_columns]
+    new_columns = [column.replace('ã', 'a') for column in new_columns]
+    new_columns = [column.replace('â', 'a') for column in new_columns]
+    new_columns = [column.replace('ç', 'c') for column in new_columns]
+    new_columns = [column.replace('\n', '') for column in new_columns]
+
+    return new_columns
+
+
+def format_name_rubric(name):
+    """
+    Formata o nome da rubrica, pois tem algumas regras no sistema Domíno,
+    além disso adiciona o sufixo 'CONV.' para indicar que é uma rubrica
+    do concorrente
+    """
+    aux = str(name).replace('-', '')
+    aux = aux.replace('.', '')
+    new_name = f'CONV. {aux[0:34]}'
+    return new_name
+
+
+def format_int(value, default_value_error=False, default_value=''):
+    """
+    Formatar valor para inteiro.
+    Em casos de erro é possível configurar um retorno padrão com as
+    variáveis "default_value_error" e "default_value"
+    """
+    try:
+        int(value)
+        return int(value)
+    except:
+        if default_value_error:
+            return default_value
+        else:
+            return False
+
+
+def order_dates(iterator_dates):
+    """
+    Ordena uma série de datas em sequencia
+    """
+    converted_dates = [convert_date(date, '%d/%m/%Y') for date in iterator_dates]
+    return sorted(converted_dates)
+
+
+def download_def_db():
+    """
+    Realiza o donwload de um banco SQLite que contém a DEF das tabelas
+    """
+    try:
+        ftp = ftplib.FTP(FTP_HOST)
+        ftp.login(FTP_USER, FTP_PASSWORD)
+        ftp.encoding = 'ANSI'
+        ftp.cwd(FTP_ROOT_PATH)
+
+        filenames = ftp.nlst()
+
+        for filename in filenames:
+            if 'def_tables.db' in filename:
+                with open('def_tables.db', 'wb' ) as db_file:
+                    ftp.retrbinary('RETR %s' % filename, db_file.write)
+
+        ftp.quit()
+        return True
+    except:
+        return False
+
+
+def create_folder(name_folder, clean_path=False):
+    """
+    Cria um diretório no caminho especificado
+    :clean_path -> Limpa o caminho especificado se ele existir
+    """
+    if clean_path and isdir(name_folder):
+        rmtree(name_folder)
+
+    if not isdir(name_folder):
+        mkdir(name_folder)
