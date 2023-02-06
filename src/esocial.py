@@ -3,7 +3,12 @@ from tqdm import tqdm
 from sqlalchemy import create_engine
 import xml.dom.minidom as xml
 import pandas as pd
-
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from src.classes.Table import Table
 from src.classes.StorageData import StorageData
 from src.classes.Sequencial import Sequencial
@@ -85,7 +90,30 @@ class eSocialXML():
     
     def baixar_dados_esocial(self):
         '''Acessa o portal e-Social com as credenciais necessárias e faz download dos arquivos do período'''
-        pass
+        # # Abrir um navegador em 2º plano
+        chrome_options = Options()
+        chrome_options.headless = False
+        chrome_options.add_argument('ignore-certificate-errors')
+        #self.certificado_esocial
+        navegador = webdriver.Chrome(options=chrome_options)
+
+        # Abrir um navegador normal (visivel)
+        #navegador = webdriver.Chrome()
+
+        navegador.get("https://www.gov.br/esocial/pt-br")
+        navegador.find_element(By.XPATH, '/html/body').click()
+        navegador.find_element(By.XPATH, '//*[@id="d597868d-13e8-407b-b56a-feffb4a5d0b1"]/div/p[1]/a/img').click()
+        navegador.find_element(By.XPATH, '//*[@id="login-acoes"]/div[1]/p/button/img').click()
+        navegador.find_element(By.XPATH, '//*[@id="cert-digital"]/a').click()
+
+        # Aqui precisará de autenticação do certificado
+
+        navegador.find_element(By.XPATH, '//*[@id="menuDownload"]').click()
+        navegador.find_element(By.XPATH, '/html/body/div[3]/div[3]/div/div/ul/li[4]/ul/li[2]/a').click()
+        navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Table")
+        navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Todos os eventos entregues")
+
+        #ait.press(Keys.ENTER)
 
     def configura_conexao_esocial(self,usuario,senha,certificado,tipo_certificado = "A1"):
         '''Configura conexão da classe com o portal e-Social'''
