@@ -11,6 +11,7 @@ from src.classes.RPAConfiguracoes import RPAConfiguracoes
 from src.esocial import eSocialXML
 from src.esocial import get_codi_emp
 from src.rpa.rpa import RPA
+import src.ui.components_ui as components_ui
 
 
 class eSocial(QMainWindow):
@@ -26,6 +27,7 @@ class eSocial(QMainWindow):
         Declarar componentes que serão utilizados da interface
         """
         self.__window.setupUi(self)
+        self.__widget = self.__window.centralwidget
         self.setWindowTitle('Conversão de Movimentos - e-Social')
 
         self.__tabela_empresas = self.__window.tableWidget
@@ -392,8 +394,19 @@ class eSocial(QMainWindow):
         self.__dialog.init_gui()
         self.__dialog.config_run.connect(self.iniciar_rpa)
 
-
     def iniciar_rpa(self, local, machines):
+        def finish_process(success, message):
+            print(success, 'ERROR:    ', message)
+            if success:
+                components_ui.message_sucess(self.__widget, 'Processo finalizado!')
+                self.set_progress('Processo completo...', 100)
+            else:
+                components_ui.message_error(self.__widget, message)
+                self.set_progress('Erro ao executar RPA...', 0)
+
+        def update_progress(progress):
+            self.set_progress(progress[0], progress[1])
+
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
         indice = str(self.__tabela_empresas.selectedItems()[0].row())
 
@@ -404,20 +417,32 @@ class eSocial(QMainWindow):
         usuario_sgd = self.__empresas[indice]["usuario_sgd"]
         senha_sgd = self.__empresas[indice]["senha_sgd"]
 
-        rpa = RPA(f"{self.__diretorio_trabalho}\\{inscricao}\\rpa", base_dominio, usuario_dominio, senha_dominio, usuario_sgd, senha_sgd)
+        # Iniciar o RPA em uma Thread separada para não travar a interface
+        self.thread2 = QThread()
+        self.rpa = RPA()
+        self.rpa.init(f"{self.__diretorio_trabalho}\\{inscricao}\\rpa", base_dominio, usuario_dominio, senha_dominio, usuario_sgd, senha_sgd)
+
+        self.rpa.moveToThread(self.thread2)
 
         # validar se nenhum ponto cadastral pode interferir nos cálculos
-        if rpa.invalid_cadastral_conversion():
+        if self.rpa.invalid_cadastral_conversion():
             print('parte cadastral inválida')
             return False
-        #
-        rpa.prepare(codi_emp, '01/2022', '01/2023')
-        rpa.prepare_machines_for_calc(local, machines)
-        # rpa.start()
 
-        self.atualiza_status("Cálculo finalizado")
-        print('terminou')
+        self.rpa.prepare(codi_emp, '01/2022', '01/2023')
+        self.rpa.prepare_machines_for_calc(local, machines)
 
+        self.thread2.started.connect(self.rpa.start)
+        self.rpa.finished.connect(self.thread2.quit)
+        self.thread2.finished.connect(self.thread2.deleteLater)
+        self.thread2.start()
+
+        # vai recebendo sinais conforme avança o processamento
+        self.rpa.progress.connect(update_progress)
+        self.rpa.success.connect(finish_process)
+
+    def set_progress(self, text, percent):
+        print(f'ATUALIZACAO: {percent}%, {text}')
 
 class eSocialConfiguracoes(QMainWindow):
     config_run = Signal(dict)

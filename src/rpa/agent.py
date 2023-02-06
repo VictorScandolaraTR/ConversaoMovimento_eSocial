@@ -8,6 +8,7 @@ from pathlib import Path
 import tkinter as tk
 from threading import Thread
 import logging
+import json
 
 from src.database.Sybase import Sybase
 from src.classes.Table import Table

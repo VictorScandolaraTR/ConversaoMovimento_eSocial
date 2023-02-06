@@ -1,3 +1,4 @@
+from PySide6.QtCore import QObject, Signal
 import logging
 from os.path import isfile
 from shutil import copy, move, make_archive, copytree
@@ -6,6 +7,8 @@ from threading import Thread
 import multiprocessing
 from time import sleep
 import json
+from sys import exc_info
+from os.path import split
 
 from src.rpa.agent import Agent
 from src.database.Sybase import Sybase
@@ -18,14 +21,19 @@ from src.database.SQLite_tables import (
 from src.utils.functions import *
 
 
-class RPA:
+class RPA(QObject):
+
+    finished = Signal()
+    success = Signal(bool, str)
+    progress = Signal(list)
+
     DEFAULT_PORT = 1112
     SIZE_BUFFER_PACKETS = 1024
     DEFAULT_USER = 'GERENTE'
     DEFAULT_PASSWORD = 'gerente'
     DEFAULT_PASSWORD_CREATED = '123456'
 
-    def __init__(self, path_converion, database, username, password, sgd_username, sgd_password):
+    def init(self, path_converion, database, username, password, sgd_username, sgd_password):
         """
         Recebe os parâmetros para a execução do RPA
         """
@@ -39,9 +47,15 @@ class RPA:
         self.__companies_calc = list()
         self.__init_competence = ''
         self.__end_competence = ''
+        self.__local = False
+        self.__machines = []
+        self.__current_company = -1
 
         # variáveis utilizadas para controle dos agentes
         self.__init_server = False
+
+        # iniciar arquivo de log do RPA
+        logging.basicConfig(filename=f'{self.__conversion_path}\\messages.log', encoding='utf-8', level=logging.INFO, filemode='w')
 
     def prepare(self, codi_emp, init_competence, end_competence):
         """
@@ -86,23 +100,18 @@ class RPA:
             rmtree(f'{self.__conversion_path}\\SQLs')
         copytree(f'.\\SQLs', f'{self.__conversion_path}\\SQLs')
 
-    def prepare_machines_for_calc(self, local_run, machines):
+    def prepare_machines_for_calc(self, local, machines):
         """
         Se conecta com os agentes nas máquinas que irão ser utilizadas para cálculo
         """
-        Thread(target=self.init_server_communication).start()
+        self.__local = local
+        self.__machines = machines
 
-        if local_run:
-            Thread(target=self.init_local_agent).start()
-
-        self.await_connections(local_run, machines)
-
-        # Fica verificando novas conexões
-        Thread(target=self.await_new_connections).start()
-
+        # manda para as máquinas que irão calcular os dados necessários
         if machines:
             self.compact_data_calc()
             self.send_data(machines)
+
 
     def compact_data_calc(self):
         """
@@ -330,7 +339,7 @@ class RPA:
                 if self.__init_server:
                     try:
                         client, address = self.server.accept()
-                        self.__user_connection[address[0]] = False
+                        self.__user_connection[address[0]] = ''
                         connections += 1
                         Thread(target=self.handle_client, args=(client, address[0])).start()
                     except Exception as e:
@@ -418,13 +427,11 @@ class RPA:
                                 company = int(data['company'])
 
                                 if company == -1:
-                                    self.print_in_log(
-                                        error=f"Erro durante execução da maquina {ip_client} exceção: '{error}'")
+                                    self.print_in_log(error=f"Erro durante execução da maquina {ip_client} exceção: '{error}'")
                                     self.send_action('quit', 0, client)
                                     break
                                 else:
-                                    self.print_in_log(
-                                        error=f"Erro de cálculo na máquina {ip_client} exceção: '{error}'")
+                                    self.print_in_log(error=f"Erro de cálculo na máquina {ip_client} exceção: '{error}'")
                     else:
                         # para a estação que está criando os usuários
                         # fica checando o progresso, pois a cada sinal de
@@ -451,13 +458,11 @@ class RPA:
                                     company = int(data['company'])
 
                                     if company == -1:
-                                        self.print_in_log(
-                                            error=f"Erro durante execução da maquina {ip_client} exceção: '{error}'")
+                                        self.print_in_log(error=f"Erro durante execução da maquina {ip_client} exceção: '{error}'")
                                         self.send_action('quit', 0, client)
                                         break
                                     else:
-                                        self.print_in_log(
-                                            error=f"Erro de cálculo na máquina {ip_client} exceção: '{error}'")
+                                        self.print_in_log(error=f"Erro de cálculo na máquina {ip_client} exceção: '{error}'")
 
                         else:
                             # estações ficam esperando até que seja disponibilizado um usuário para acesso
@@ -483,13 +488,11 @@ class RPA:
                                         company = int(data['company'])
 
                                         if company == -1:
-                                            self.print_in_log(
-                                                error=f"Erro durante execução da maquina {ip_client} exceção: '{error}'")
+                                            self.print_in_log(error=f"Erro durante execução da maquina {ip_client} exceção: '{error}'")
                                             self.send_action('quit', 0, client)
                                             break
                                         else:
-                                            self.print_in_log(
-                                                error=f"Erro de cálculo na máquina {ip_client} exceção: '{error}'")
+                                            self.print_in_log(error=f"Erro de cálculo na máquina {ip_client} exceção: '{error}'")
 
                 # quando termina a criação de usuários avança para as importação e cálculos
                 if self.__end_create_users:
@@ -534,13 +537,11 @@ class RPA:
                                 company = int(data['company'])
 
                                 if company == -1:
-                                    self.print_in_log(
-                                        error=f"Erro durante execução da maquina {ip_client} exceção: '{error}'")
+                                    self.print_in_log(error=f"Erro durante execução da maquina {ip_client} exceção: '{error}'")
                                     self.send_action('quit', 0, client)
                                     break
                                 else:
-                                    self.print_in_log(
-                                        error=f"Erro de cálculo na máquina {ip_client} exceção: '{error}'")
+                                    self.print_in_log(error=f"Erro de cálculo na máquina {ip_client} exceção: '{error}'")
 
                     # inicia a importação de lançamentos
                     if not self.__init_import_events:
@@ -596,13 +597,11 @@ class RPA:
                                 company = int(data['company'])
 
                                 if company == -1:
-                                    self.print_in_log(
-                                        error=f"Erro durante execução da maquina {ip_client} exceção: '{error}'")
+                                    self.print_in_log(error=f"Erro durante execução da maquina {ip_client} exceção: '{error}'")
                                     self.send_action('quit', 0, client)
                                     break
                                 else:
-                                    self.print_in_log(
-                                        error=f"Erro de cálculo na máquina {ip_client} exceção: '{error}'")
+                                    self.print_in_log(error=f"Erro de cálculo na máquina {ip_client} exceção: '{error}'")
                         else:
                             self.send_action('quit', 0, client)
                             break
@@ -625,8 +624,7 @@ class RPA:
                                 self.__current_company += 1
                                 self.send_action('calc', int(self.__companies_calc[self.__current_company]), client)
                                 if int(company) != 0:
-                                    self.progress.emit(
-                                        [f'Cálculo da empresa {company} finalizado...', self.current_percent])
+                                    self.progress.emit([f'Cálculo da empresa {company} finalizado...', self.current_percent])
                                     self.print_in_log(info=f"Fim dos cálculos da empresa {company}")
                                     self.__companies_calc_finished.append(company)
                             else:
@@ -652,21 +650,26 @@ class RPA:
                             company = int(data['company'])
 
                             if company == -1:
-                                self.print_in_log(
-                                    error=f"Erro durante cálculo da empresa {company} na maquina {ip_client} exceção: '{error}'")
+                                self.print_in_log(error=f"Erro durante cálculo da empresa {company} na maquina {ip_client} exceção: '{error}'")
                                 self.send_action('quit', 0, client)
                                 break
                             else:
                                 self.print_in_log(error=f"Erro de cálculo na máquina {ip_client} exceção: '{error}'")
 
             client.close()
-        except Exception as e:
-            self.print_in_log(error=e)
+        except Exception as error:
+            context_error = exc_info()
+            _, _, exc_tb = context_error
+            filename = split(exc_tb.tb_frame.f_code.co_filename)[1]
+            line_error = exc_tb.tb_lineno
+            message = f'Arquivo {filename}, linha {line_error}, erro: {error}'
+
+            self.print_in_log(error=str(message))
             self.print_in_log(end=True)
             self.success.emit(False, 'Erro ao executar cálculos!')
             self.finished.emit()
 
-    def print_in_log(self, init=False, end=False, error=False, info=False, cadastro=False):
+    def print_in_log(self, init=False, end=False, error='', info='', cadastro=False):
         """
         Função para gravar dados no arquivo de log
         """
@@ -721,13 +724,40 @@ class RPA:
         return self.invalid_records
 
     def start(self):
-        self.print_in_log(init=True)
+        try:
+            self.progress.emit(['Criando arquivo de log...', 5])
+            self.print_in_log(init=True)
 
-        self.check_cadastral_conversion(remove_company=True)
+            self.check_cadastral_conversion(remove_company=True)
 
+            self.progress.emit(['Preparando agentes de execução...', 10])
+            Thread(target=self.init_server_communication).start()
 
-        # aguarda enquanto estiver agentes em execução
-        while not self.__end_finish_process:
-            sleep(3)
+            if self.__local:
+                Thread(target=self.init_local_agent).start()
 
-        self.print_in_log(end=True)
+            self.progress.emit(['Distribuindo empresas entre os agentes...', 12])
+            self.await_connections(self.__local, self.__machines)
+
+            # Fica verificando novas conexões
+            Thread(target=self.await_new_connections).start()
+
+            self.progress.emit(['Configurando ambiente para cálculo...', 15])
+            # aguarda enquanto estiver agentes em execução
+            while not self.__end_finish_process:
+                sleep(3)
+
+            self.print_in_log(end=True)
+            self.success.emit(True, '')
+            self.finished.emit()
+        except Exception as error:
+            context_error = exc_info()
+            _, _, exc_tb = context_error
+            filename = split(exc_tb.tb_frame.f_code.co_filename)[1]
+            line_error = exc_tb.tb_lineno
+            message = f'Arquivo {filename}, linha {line_error}, erro: {error}'
+
+            self.print_in_log(error=str(message))
+            self.print_in_log(end=True)
+            self.success.emit(False, 'Erro ao executar cálculos!')
+            self.finished.emit()
