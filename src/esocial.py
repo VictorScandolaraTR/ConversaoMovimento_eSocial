@@ -1589,6 +1589,11 @@ class eSocialXML():
                             table.set_value('SOMA_INF_REN', 'N')
                             table.set_value('REND_TRIBUTAVEIS', '0')
 
+                        # preenche alguns campos padrões para a rúbrica
+                        for key in campos_padra_rubrica.keys():
+                            if is_null(table.get_value(key)):
+                                table.set_value(key, campos_padra_rubrica.get(key))
+
                         rubrics_importation.append(table.do_output())
 
                         # checa se a rubrica deve entrar para médias
@@ -1660,6 +1665,9 @@ class eSocialXML():
                                 table_calc.set_value('INCLUSAO_VALIDADA_ESOCIAL', base_calc['INCLUSAO_VALIDADA_ESOCIAL'])
                                 table_calc.set_value('GERAR_RETIFICACAO_ESOCIAL', base_calc['GERAR_RETIFICACAO_ESOCIAL'])
                                 table_calc.set_value('PROCESSAR_EXCLUSAO_ESOCIAL', base_calc['PROCESSAR_EXCLUSAO_ESOCIAL'])
+                                table_calc.set_value('I_DADOS_EVENTOS_ESOCIAL', 'NULO')
+                                table_calc.set_value('I_LOTE_ESOCIAL', 'NULO')
+                                table_calc.set_value('STATUS_ESOCIAL', 'NULO')
                                 table_calc.set_value('COMPANY_ID', base_calc['COMPANY_ID'])
 
                                 rubrics_base_calc_importation.append(table_calc.do_output())
@@ -1918,6 +1926,9 @@ def generate_default_base(codi_emp, i_eventos, i_cadbases):
     table_calc.set_value('INCLUSAO_VALIDADA_ESOCIAL', 0)
     table_calc.set_value('GERAR_RETIFICACAO_ESOCIAL', 0)
     table_calc.set_value('PROCESSAR_EXCLUSAO_ESOCIAL', 0)
+    table_calc.set_value('I_DADOS_EVENTOS_ESOCIAL', 'NULO')
+    table_calc.set_value('I_LOTE_ESOCIAL', 'NULO')
+    table_calc.set_value('STATUS_ESOCIAL', 'NULO')
     table_calc.set_value('COMPANY_ID', '00000000000000000000000000000000')
 
     return table_calc.do_output()
