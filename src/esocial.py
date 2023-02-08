@@ -1131,13 +1131,17 @@ class eSocialXML():
                         elif motivo == '06':
                             motivo = '18'
 
+                    formated_data_fim = transform_date(data_fim, '%Y-%m-%d', '%d/%m/%Y', default_value_error='NULO')
+                    if is_null(formated_data_fim):
+                        continue
+
                     table = Table('FOAFASTAMENTOS_IMPORTACAO')
 
                     table.set_value('CODI_EMP', codi_emp)
                     table.set_value('I_EMPREGADOS', i_empregados)
                     table.set_value('I_AFASTAMENTOS', motivo)
                     table.set_value('DATA_REAL', transform_date(data_inicio, '%Y-%m-%d', '%d/%m/%Y'))
-                    table.set_value('DATA_FIM', transform_date(data_fim, '%Y-%m-%d', '%d/%m/%Y', default_value_error='NULO'))
+                    table.set_value('DATA_FIM', formated_data_fim)
                     data_foafastamentos_importacao.append(table.do_output())
 
         # demissões empregados
@@ -1294,7 +1298,7 @@ class eSocialXML():
             table.set_value('ABONO_INICIO', abono_inicio)
             table.set_value('ABONO_FIM', abono_fim)
             table.set_value('DATA_PAGTO', transform_date(data_pagamento, '%Y-%m-%d', '%d/%m/%Y'))
-            table.set_value('PAGA_AD13', '')
+            table.set_value('PAGA_AD13', 'N')
             table.set_value('TIPO', '1')
             table.set_value('GOZO_INICIO_DN', gozo_inicio_dn)
             table.set_value('GOZO_FIM_DN', gozo_fim_dn)
@@ -1302,6 +1306,18 @@ class eSocialXML():
             table.set_value('ABONO_FIM_DN', abono_fim_dn)
             table.set_value('INICIO_AQUISITIVO', transform_date(data_inicio_aquisitivo, '%Y-%m-%d', '%d/%m/%Y'))
             table.set_value('FIM_AQUISITIVO', transform_date(data_fim_aquisitivo, '%Y-%m-%d', '%d/%m/%Y'))
+
+            table.set_value('MEDIAS_MANUAL', 'N')
+            table.set_value('DIAS_FALTAS', '0')
+            table.set_value('BAIXA_PROV_FERIAS', '0')
+            table.set_value('BAIXA_PROV_ADICFERIAS', '0')
+            table.set_value('BAIXA_PROV_INSS', '0')
+            table.set_value('BAIXA_PROV_FGTS', '0')
+            table.set_value('BAIXA_PROV_PIS', '0')
+            table.set_value('I_PAGTO', 'NULO')
+            table.set_value('DESCONTAR_FALTAS', 'N')
+            table.set_value('I_FERIAS_COLETIVAS', 'NULO')
+            table.set_value('STATUS_ESOCIAL', 'NULO')
 
             data_foferias_gozo.append(table.do_output())
 
