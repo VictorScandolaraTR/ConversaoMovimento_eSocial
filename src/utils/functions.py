@@ -501,3 +501,26 @@ def create_folder(name_folder, clean_path=False):
 
     if not isdir(name_folder):
         mkdir(name_folder)
+
+
+def format_value(value, number_right_characters):
+    """
+    Formata um valor decimal com uma quantidade específica de caracters depois do ponto
+    """
+    left_characters = '0'
+    right_characters = '0'*number_right_characters
+    splited_value = str(value).split('.')
+
+    if len(splited_value) >= 1:
+        left_characters = splited_value[0]
+
+    if len(splited_value) > 1:
+        right_characters = splited_value[1]
+        if len(right_characters) > number_right_characters:
+            right_characters = right_characters[:number_right_characters]
+        elif len(right_characters) < number_right_characters:
+            right_characters += '0'*(number_right_characters - len(right_characters))
+
+    new_value = f'{left_characters}.{right_characters}'
+
+    return new_value

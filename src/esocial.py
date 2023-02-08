@@ -766,6 +766,7 @@ class eSocialXML():
 
         rubrics_relationship = StorageData()
         data_vacation = StorageData()
+        check_lancto = StorageData()
         general_rubrics_relationship, generate_rubrics, ignore_rubrics = read_rubric_relationship(f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx')
         handle_lauch_rubrics = self.handle_lauch_rubrics()
         self.read_rescission_rubrics(handle_lauch_rubrics)
@@ -865,18 +866,29 @@ class eSocialXML():
                 if is_null(i_eventos):
                     continue
 
-                table = Table('FOLANCAMENTOS_EVENTOS')
-                table.set_value('CODI_EMP', codi_emp)
-                table.set_value('I_EMPREGADOS', i_empregados)
-                table.set_value('TIPO_PROCESSO', tipo_processo)
-                table.set_value('COMPETENCIA_INICIAL', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
-                table.set_value('DATA_PAGAMENTO_ALTERA_CALCULO', transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y'))
-                table.set_value('I_EVENTOS', i_eventos)
-                table.set_value('VALOR_INFORMADO', valor_informado)
-                table.set_value('VALOR_CALCULADO', valor_calculado)
-                table.set_value('ORIGEM_REGISTRO', '3')
+                if not check_lancto.exist([codi_emp, i_empregados, complete_competence, tipo_processo, i_eventos]):
+                    table = Table('FOLANCAMENTOS_EVENTOS')
+                    table.set_value('CODI_EMP', codi_emp)
+                    table.set_value('I_EMPREGADOS', i_empregados)
+                    table.set_value('TIPO_PROCESSO', tipo_processo)
+                    table.set_value('COMPETENCIA_INICIAL', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
+                    table.set_value('DATA_PAGAMENTO_ALTERA_CALCULO', transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y'))
+                    table.set_value('I_EVENTOS', i_eventos)
+                    table.set_value('VALOR_INFORMADO', format_value(valor_informado, 2))
+                    table.set_value('VALOR_CALCULADO', format_value(valor_calculado, 2))
+                    table.set_value('ORIGEM_REGISTRO', '3')
+                    table.set_value('TIPO_LANCAMENTO', '1')
 
-                data_lancamentos_eventos.append(table.do_output())
+                    check_lancto.add(table.do_output(), [codi_emp, i_empregados, complete_competence, tipo_processo, i_eventos])
+                    data_lancamentos_eventos.append(table.do_output())
+                else:
+                    old_table = check_lancto.get([codi_emp, i_empregados, complete_competence, tipo_processo, i_eventos])
+                    new_table = dict(old_table)
+                    new_table['VALOR_INFORMADO'] = format_value(float(old_table['VALOR_INFORMADO']) + float(valor_informado), 2)
+                    new_table['VALOR_CALCULADO'] = format_value(float(old_table['VALOR_CALCULADO']) + float(valor_calculado), 2)
+                    data_lancamentos_eventos.remove(old_table)
+                    data_lancamentos_eventos.append(new_table)
+                    check_lancto.overwrite(new_table, [codi_emp, i_empregados, complete_competence, tipo_processo, i_eventos])
             else:
                 # eventos que entrarão para médias
                 if str(i_eventos) in rubrics_averages:
