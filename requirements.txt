@@ -10,3 +10,4 @@ peewee
 autoit
 PySide6
 cx-freeze
+selenium
