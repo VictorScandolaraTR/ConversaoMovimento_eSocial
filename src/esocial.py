@@ -1,36 +1,29 @@
-import os, shutil, json, xmltodict, Levenshtein
+import os, shutil, json, xmltodict, Levenshtein, shutil, hashlib, pyautogui, time
 from tqdm import tqdm
 from sqlalchemy import create_engine
 import xml.dom.minidom as xml
 import pandas as pd
+import winreg
+from datetime import timedelta
+from OpenSSL import crypto
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import WebDriverWait
 from src.classes.Table import Table
 from src.classes.StorageData import StorageData
 from src.classes.Sequencial import Sequencial
-from src.database.Sybase import Sybase
-from src.database.SQLite_tables import *
 from src.utils.functions import *
-from src.database.data_rubrics import *
-from src.database.depara import *
 
 class eSocialXML():
-    def __init__(self, diretorio_trabalho, inscricao):
-        self.__inscricao = inscricao
-        self.DIRETORIO_TRABALHO = f'{diretorio_trabalho}\\{inscricao}'
-        self.DIRETORIO_RAIZ = self.DIRETORIO_TRABALHO
-        self.DIRETORIO_XML = f"{self.DIRETORIO_TRABALHO}\\eventos"
-        self.DIRETORIO_DOWNLOADS = f"{self.DIRETORIO_TRABALHO}\\downloads"
-        self.DIRETORIO_SAIDA = f"{self.DIRETORIO_TRABALHO}\\saida"
-        self.DIRETORIO_RPA = f"{self.DIRETORIO_TRABALHO}\\rpa"
-        self.DIRETORIO_IMPORTAR = f"{self.DIRETORIO_TRABALHO}\\rpa\\Importar"
-        self.BANCO_SQLITE = f"{self.DIRETORIO_TRABALHO}\\rpa\\query.db"
-        self.INIT_COMPETENCE = '01/01/2022'
-        self.END_COMPETENCE = '01/01/2023'
+    def __init__(self, diretorio_xml):
+        self.DIRETORIO_RAIZ = diretorio_xml
+        self.DIRETORIO_XML = f"{diretorio_xml}\\eventos"
+        self.DIRETORIO_DOWNLOADS = f"{diretorio_xml}\\downloads"
+        self.DIRETORIO_SAIDA = f"{diretorio_xml}\\saida"
+        self.DIRETORIO_IMPORTAR = f"{diretorio_xml}\\importar"
 
         self.dicionario_rubricas_dominio = {} # Rubricas Domínio
         self.dicionario_s1010 = {} # Rubricas
@@ -42,33 +35,35 @@ class eSocialXML():
         self.dicionario_s2399 = {} # Demissão (contribuintes)
 
         # Parâmetros de operação
-        self.carrega_parametros()
-
-        # cria as pastas necessárias
-        create_folder(self.DIRETORIO_XML)
-        create_folder(self.DIRETORIO_DOWNLOADS)
-        create_folder(self.DIRETORIO_RPA)
-        create_folder(self.DIRETORIO_IMPORTAR)
+        try:
+            self.carrega_parametros()
+        except:
+            self.base_dominio = "Contabil"
+            self.usuario_dominio = "EXTERNO"
+            self.senha_dominio = "123456"
+            self.empresa_padrao_rubricas = "9999"
+            self.usuario_esocial = ""
+            self.senha_esocial = ""
+            self.certificado_esocial = ""
+            self.tipo_certificado_esocial = "A1"
 
     def carrega_parametros(self):
-        """
-        Carrega os parametros utilizados do banco SQLite
-        """
-        diretorio_config_database = os.path.dirname(self.DIRETORIO_RAIZ)
-        engine = create_engine(f"sqlite:///{diretorio_config_database}/operacao.db")
+        '''Carrega os parâmetros utilizados do arquivo parametros.json'''
 
-        df = pd.read_sql(f'SELECT * FROM EMPRESAS WHERE inscricao = {self.__inscricao}', con=engine)
-        for index in range(len(df)):
-            self.base_dominio = df.loc[index, "base_dominio"]
-            self.usuario_dominio = df.loc[index, "usuario_dominio"]
-            self.senha_dominio = df.loc[index, "senha_dominio"]
-            self.empresa_padrao_rubricas = df.loc[index, "empresa_padrao_rubricas"]
-            self.usuario_esocial = df.loc[index, "usuario_esocial"]
-            self.senha_esocial = df.loc[index, "senha_esocial"]
-            self.certificado_esocial = df.loc[index, "certificado_esocial"]
-            self.tipo_certificado_esocial = df.loc[index, "tipo_certificado_esocial"]
-            self.usuario_sgd = df.loc[index, "usuario_sgd"]
-            self.senha_sgd = df.loc[index, "senha_sgd"]
+        f = open(f"{self.DIRETORIO_RAIZ}\\parametros.json","r")
+        parametros_texto = f.readline()
+        f.close
+
+        parametros = json.loads(parametros_texto)
+
+        self.base_dominio = parametros["base_dominio"]
+        self.usuario_dominio = parametros["usuario_dominio"]
+        self.senha_dominio = parametros["senha_dominio"]
+        self.empresa_padrao_rubricas = parametros["empresa_padrao_rubricas"]
+        self.usuario_esocial = parametros["usuario_esocial"]
+        self.senha_esocial = parametros["senha_dominio"]
+        self.certificado_esocial = parametros["certificado_esocial"]
+        self.tipo_certificado_esocial = parametros["tipo_certificado_esocial"]
 
     def salvar_parametros(self):
         '''Salva os parâmetros utilizados no arquivo parametros.json'''
@@ -87,33 +82,133 @@ class eSocialXML():
         f = open(f"{self.DIRETORIO_RAIZ}\\parametros.json","w")
         f.write(json.dumps(parametros))
         f.close
+
+    def UpdateStringValue(self,strigValueName,newValueOfStrinValue, stringValuePath):
+        winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE, stringValuePath)
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, stringValuePath, 0, winreg.KEY_ALL_ACCESS)
+        winreg.SetValueEx(key, strigValueName, 0, winreg.REG_SZ, newValueOfStrinValue)
+        winreg.CloseKey(key)
+
+    def obter_certificado(self, caminho, senha):
+        #return pkcs12.get_certificate()
+
+        # Extract the certificate and key from the .pfx file
+        p12 = crypto.load_pkcs12(open(caminho, 'rb').read(), senha)
+        certificate = crypto.dump_certificate(crypto.FILETYPE_PEM, p12.get_certificate())
+
+        # Convert the certificate from PEM format to DER format
+        certificate_der = crypto.dump_certificate(crypto.FILETYPE_PEM, crypto.load_certificate(crypto.FILETYPE_PEM, certificate))
+
+        # Get the thumbprint of the certificate
+        thumbprint = DerSequence([int(b.encode('hex'), 16) for b in hashlib.sha1(certificate_der).digest()])
+
+        print(thumbprint)
     
     def baixar_dados_esocial(self):
         '''Acessa o portal e-Social com as credenciais necessárias e faz download dos arquivos do período'''
-        # # Abrir um navegador em 2º plano
+        os.system(f"del /q \"{self.DIRETORIO_DOWNLOADS}\"")
+        url = "https://www.gov.br/esocial/pt-br"
+        intervalo_dias = 92
+        data_inicio_esocial = datetime.strptime('01/01/2018','%d/%m/%Y')
+        data_fim_periodo = datetime.now()
+        data_inicio_periodo = data_fim_periodo - timedelta(days=intervalo_dias)
+        downloads_folder = os.path.join(os.environ["USERPROFILE"], "Downloads")
+        #cert_thumbprint = self.obter_certificado(self.certificado_esocial,self.senha_esocial).thu
+
         chrome_options = Options()
         chrome_options.headless = False
-        chrome_options.add_argument('ignore-certificate-errors')
-        #self.certificado_esocial
-        navegador = webdriver.Chrome(options=chrome_options)
+        navegador = webdriver.Chrome(options=chrome_options,executable_path="bin\\chromedriver.exe")
 
-        # Abrir um navegador normal (visivel)
-        #navegador = webdriver.Chrome()
-
-        navegador.get("https://www.gov.br/esocial/pt-br")
+        navegador.get(url)
         navegador.find_element(By.XPATH, '/html/body').click()
         navegador.find_element(By.XPATH, '//*[@id="d597868d-13e8-407b-b56a-feffb4a5d0b1"]/div/p[1]/a/img').click()
         navegador.find_element(By.XPATH, '//*[@id="login-acoes"]/div[1]/p/button/img').click()
         navegador.find_element(By.XPATH, '//*[@id="cert-digital"]/a').click()
+        navegador.minimize_window()
 
         # Aqui precisará de autenticação do certificado
+        
+        # Solicita todos os eventos da data atual até o início do e-Social (01/01/2018) em intervalos de tempo pré-definidos
+        solicitacoes = 0
+        while data_inicio_periodo > data_inicio_esocial:
+            navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Solicitacao')
+            navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Todos os eventos entregues")
+            
+            navegador.find_element(By.XPATH, '//*[@id="DataInicial"]').clear()
+            navegador.find_element(By.XPATH, '//*[@id="DataInicial"]').send_keys(data_inicio_periodo.strftime('%d/%m/%Y'))
+            navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').click()
+            navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').clear()
+            navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').send_keys(data_fim_periodo.strftime('%d/%m/%Y'))
 
-        navegador.find_element(By.XPATH, '//*[@id="menuDownload"]').click()
-        navegador.find_element(By.XPATH, '/html/body/div[3]/div[3]/div/div/ul/li[4]/ul/li[2]/a').click()
-        navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Table")
+            navegador.find_element(By.XPATH, '//*[@id="btnSalvar"]').click()
+
+            print("Solicitado\t"+data_inicio_periodo.strftime('%d/%m/%Y')+"\t"+data_fim_periodo.strftime('%d/%m/%Y'))
+            
+            data_fim_periodo = data_inicio_periodo - timedelta(days=1)
+            data_inicio_periodo = data_inicio_periodo - timedelta(days=intervalo_dias)
+            
+            solicitacoes = solicitacoes + 1
+
+        data_inicio_periodo = data_inicio_esocial
+        navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Solicitacao')
         navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Todos os eventos entregues")
+        navegador.find_element(By.XPATH, '//*[@id="DataInicial"]').clear()
+        navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').clear()
+        navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').send_keys(data_fim_periodo.strftime('%d/%m/%Y'))
+        navegador.find_element(By.XPATH, '//*[@id="DataInicial"]').send_keys(data_inicio_periodo.strftime('%d/%m/%Y'))
 
-        #ait.press(Keys.ENTER)
+        navegador.find_element(By.XPATH, '//*[@id="btnSalvar"]').click()
+
+        #print(data_inicio_periodo.strftime('%d/%m/%Y')+"\t"+data_fim_periodo.strftime('%d/%m/%Y'))
+
+        # Consulta resultado das solicitações
+        navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
+        navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
+        
+        lista = list(range(1, solicitacoes+1))
+        lista_downloads = []
+        lista_reprocessamento = []
+        for i in lista:
+            status = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[5]').text
+            numero_solicitacao = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[1]').text
+            
+            if(status=="Disponível para Baixar"):
+                lista_downloads.append(numero_solicitacao)
+                navegador.get(f"https://www.esocial.gov.br/portal/Download/Pedido/Download?idPedido={numero_solicitacao}")
+
+                navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
+                navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
+
+            if(status=="Solicitado"):
+                lista_reprocessamento.append(numero_solicitacao)
+
+        while(len(lista_reprocessamento)>0):
+            for item in lista_reprocessamento:
+                navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
+                navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
+
+                status = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[5]').text
+                numero_solicitacao = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[1]').text
+                
+                if(status=="Disponível para Baixar"):
+                    lista_downloads.append(numero_solicitacao)
+                    navegador.get(f"https://www.esocial.gov.br/portal/Download/Pedido/Download?idPedido={numero_solicitacao}")
+
+                    navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
+                    navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
+
+                    lista_reprocessamento.remove(item)
+
+                if(status!="Solicitado"):
+                    lista_reprocessamento.remove(item)
+        
+        for item in lista_downloads:
+            print(item)
+            shutil.copy2(f"{downloads_folder}\\{item}.zip",f"{self.DIRETORIO_DOWNLOADS}\\{item}.zip")
+        
+        #navegador.add_cookie('') # Só pra dar erro e travar a execução
+        
+        navegador.close()
 
     def configura_conexao_esocial(self,usuario,senha,certificado,tipo_certificado = "A1"):
         '''Configura conexão da classe com o portal e-Social'''
@@ -311,12 +406,12 @@ class eSocialXML():
         """
         data_employees = {}
 
-        sybase = Sybase(self.base_dominio, self.usuario_dominio, self.senha_dominio)
-        connection = sybase.connect()
+        engine = create_engine("sybase+pyodbc://{user}:{pw}@{dsn}".format(user=self.usuario_dominio, pw=self.senha_dominio, dsn=self.base_dominio))
 
-        sybase_employees = sybase.select_employees(connection)
+        sql = "SELECT CODI_EMP, I_EMPREGADOS, CPF FROM BETHADBA.FOEMPREGADOS"
+        df_empregados = pd.read_sql(sql, con=engine)
 
-        for line in sybase_employees:
+        for index, line in df_empregados.iterrows():
             codi_emp = str(line.get('CODI_EMP'))
             i_empregados = str(line.get('I_EMPREGADOS'))
             cpf = str(line.get('CPF'))
@@ -751,299 +846,59 @@ class eSocialXML():
 
         writer.close()
 
-    def gerar_arquivos_saida(self, inscricao, codi_emp, relacao_empregados):
-        """
-        Gravar os arquivos de eventos, lançamentos e médias para importação.
+    def gerar_arquivos_saida(self):
+        tabela_FOEVENTOS = []
 
-        Retorna as rubricas que são de férias e que devem ser lançadas no cálculo
-        de férias também.
-        """
-        sybase = Sybase(self.base_dominio, self.usuario_dominio, self.senha_dominio)
-        connection = sybase.connect()
+        dicionario_s1010 = self.processar_rubricas()
 
-        rubrics_averages = sybase.select_rubrics_averages(connection, self.empresa_padrao_rubricas)
-        uses_company_rubrics = sybase.select_companies_to_use_rubrics(connection)
+        for s1010 in dicionario_s1010:
+            inscricao = dicionario_s1010[s1010].get("ideEmpregador").get("nrInsc")
+            codigo_rubrica = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("ideRubrica").get("codRubr")
+            descricao = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("dscRubr")
+            natureza = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("natRubr")
+            tipo = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("tpRubr")
+            inss = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("codIncCP")
+            irrf = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("codIncIRRF")
+            fgts = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("codIncFGTS")
+            sindicato = dicionario_s1010[s1010].get("infoRubrica").get("inclusao").get("dadosRubrica").get("codIncSIND")
 
-        rubrics_relationship = StorageData()
-        data_vacation = StorageData()
-        check_lancto = StorageData()
-        general_rubrics_relationship, generate_rubrics, ignore_rubrics = read_rubric_relationship(f'{self.DIRETORIO_RAIZ}\\relacao_rubricas.xlsx')
-        handle_lauch_rubrics = self.handle_lauch_rubrics()
-        self.read_rescission_rubrics(handle_lauch_rubrics)
+            match tipo:
+                case 1: tipo = "P" # Vencimento, provento ou pensão
+                case 2: tipo = "D" # Desconto
+                case 3: tipo = "I" # Informativa
+                case 4: tipo = "ID" # Informativa dedutora
 
-        rubrics_esocial = self.generate_rubricas_esocial(generate_rubrics)
-        companies_rubrics = self.read_companies_rubrics(inscricao, codi_emp, handle_lauch_rubrics)
-        rubrics_importation, rubrics_base_calc_importation, rubrics_formula = self.complete_data_rubrics(rubrics_esocial, companies_rubrics, rubrics_relationship, rubrics_averages)
+            table = Table('FOEVENTOS')
+            table.set_value('CODI_EMP', inscricao)
+            table.set_value('I_EVENTOS', codigo_rubrica)
+            table.set_value('NOME', descricao)
+            table.set_value('PROV_DESC', tipo)
+            table.set_value('NATUREZA_FOLHA_MENSAL', natureza)
+            table.set_value('CODIGO_INCIDENCIA_INSS_ESOCIAL', inss)
+            table.set_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL', irrf)
+            table.set_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL', fgts)
+            table.set_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL', sindicato)
+            tabela_FOEVENTOS.append(table.do_output())
 
-        data_lancamentos_eventos = []
-        data_lancto_medias = []
+            table = Table('FOEVENTOS')
+            table.set_value('CODI_EMP', inscricao)
+            table.set_value('I_EVENTOS', codigo_rubrica)
+            table.set_value('NOME', descricao)
+            table.set_value('PROV_DESC', tipo)
+            table.set_value('NATUREZA_FOLHA_MENSAL', natureza)
+            table.set_value('CODIGO_INCIDENCIA_INSS_ESOCIAL', inss)
+            table.set_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL', irrf)
+            table.set_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL', fgts)
+            table.set_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL', sindicato)
+            tabela_FOEVENTOS.append(table.do_output())
 
-        # Completa o de/para de rúbricas de cada empresa, com os relacionamentos feitos na planilha
-        load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_rubrics_relationship, uses_company_rubrics)
-
-        # coletar datas de pagamento
-        payment_data = self.load_date_payment()
-
-        for line in handle_lauch_rubrics:
-            cnpj_empregador = line.get('nrInsc')
-            cpf_empregado = line.get('cpfTrab')
-            i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
-
-            if is_null(codi_emp) or is_null(i_empregados) or cnpj_empregador != inscricao:
-                continue
-
-            complete_competence = line.get('perApur')
-            if len(complete_competence) == 4:
-                # preenche o mês 12 e dia como 01
-                complete_competence += '-12-01'
-            else:
-                # preenche o dia como 01
-                complete_competence += '-01'
-
-            competence = get_competence(complete_competence)
-
-            codi_emp_eve = uses_company_rubrics.get(int(codi_emp))
-            i_eventos = rubrics_relationship.get([str(codi_emp_eve), str(line.get('codRubr'))])
-            valor_calculado = line.get('vrRubr')
-
-            valor_informado = '1'
-            if line.get('fatorRubr') is not None:
-                valor_informado = line.get('fatorRubr')
-
-            # Se estiver dentro da competência a ser calculada gera como lançamento
-            # senão lança como média
-            converted_init_competence = convert_date(self.INIT_COMPETENCE, '%d/%m/%Y')
-            converted_end_competence = convert_date(self.END_COMPETENCE, '%d/%m/%Y')
-            converted_competence = convert_date(complete_competence, '%Y-%m-%d')
-            if converted_init_competence <= converted_competence <= converted_end_competence:
-
-                # Separa o primeiro prefixo do campo, pois ele indica o tipo da folha
-                dm_dev = str(line.get('ideDmDev')).replace('RESC', '').split('_')[0]
-
-                # 11 é evento de folha mensal
-                # 41 é evento de adiantamento
-                # 51 é evento de adiantamento 13º
-                # 52 é evento de 13º integral
-                # 70 é evento de PLR
-                # 42 é evento de folha complementar
-                match dm_dev:
-                    case 'FAD13':
-                        tipo_processo = '51'
-                    case 'F13':
-                        tipo_processo = '52'
-                    case 'FAD':
-                        tipo_processo = '41'
-                    case 'FER':
-                        tipo_processo = '11'
-
-                        # Para eventos de férias, precisamos guardar eles para serem
-                        # lançados também ao calcular as férias do empregado
-                        new_format_competence = transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y')
-                        data_vacation.add(valor_informado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_INFORMADO'])
-                        data_vacation.add(valor_calculado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_CALCULADO'])
-                    case _:
-                        tipo_processo = '11'
-
-                # se não encontrar a data de pagamento, vê o dia de pagamento da competência
-                # anterior ou posterior
-                data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, competence])
-                if is_null(data_pagto):
-                    previus_competence = get_competence(add_month_to_date(complete_competence, -1, '%Y-%m-%d'))
-                    next_competence = get_competence(add_month_to_date(complete_competence, 1, '%Y-%m-%d'))
-
-                    if payment_data.exist([cnpj_empregador, cpf_empregado, previus_competence]):
-                        previus_data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, previus_competence])
-                        data_pagto = add_month_to_date(previus_data_pagto, 1, '%Y-%m-%d')
-
-                    if is_null(data_pagto):
-                        if payment_data.exist([cnpj_empregador, cpf_empregado, next_competence]):
-                            next_data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, next_competence])
-                            data_pagto = add_month_to_date(next_data_pagto, -1, '%Y-%m-%d')
-
-                if is_null(data_pagto):
-                    continue
-
-                if is_null(i_eventos):
-                    continue
-
-                if not check_lancto.exist([codi_emp, i_empregados, complete_competence, tipo_processo, i_eventos]):
-                    table = Table('FOLANCAMENTOS_EVENTOS')
-                    table.set_value('CODI_EMP', codi_emp)
-                    table.set_value('I_EMPREGADOS', i_empregados)
-                    table.set_value('TIPO_PROCESSO', tipo_processo)
-                    table.set_value('COMPETENCIA_INICIAL', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
-                    table.set_value('DATA_PAGAMENTO_ALTERA_CALCULO', transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y'))
-                    table.set_value('I_EVENTOS', i_eventos)
-                    table.set_value('VALOR_INFORMADO', format_value(valor_informado, 2))
-                    table.set_value('VALOR_CALCULADO', format_value(valor_calculado, 2))
-                    table.set_value('ORIGEM_REGISTRO', '3')
-                    table.set_value('TIPO_LANCAMENTO', '1')
-
-                    check_lancto.add(table.do_output(), [codi_emp, i_empregados, complete_competence, tipo_processo, i_eventos])
-                    data_lancamentos_eventos.append(table.do_output())
-                else:
-                    old_table = check_lancto.get([codi_emp, i_empregados, complete_competence, tipo_processo, i_eventos])
-                    new_table = dict(old_table)
-                    new_table['VALOR_INFORMADO'] = format_value(float(old_table['VALOR_INFORMADO']) + float(valor_informado), 2)
-                    new_table['VALOR_CALCULADO'] = format_value(float(old_table['VALOR_CALCULADO']) + float(valor_calculado), 2)
-                    data_lancamentos_eventos.remove(old_table)
-                    data_lancamentos_eventos.append(new_table)
-                    check_lancto.overwrite(new_table, [codi_emp, i_empregados, complete_competence, tipo_processo, i_eventos])
-            else:
-                # eventos que entrarão para médias
-                if str(i_eventos) in rubrics_averages:
-                    table = Table('FOLANCTOMEDIAS')
-                    table.set_value('CODI_EMP', codi_emp)
-                    table.set_value('I_EMPREGADOS', i_empregados)
-                    table.set_value('COMPETENCIA', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
-                    table.set_value('I_EVENTOS', i_eventos)
-                    table.set_value('VALOR', valor_calculado)
-                    table.set_value('I_FERIAS_GOZO', 'NULO')
-
-                    data_lancto_medias.append(table.do_output())
-
-        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOEVENTOS.txt', rubrics_importation)
-        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOEVENTOSBASES.txt', rubrics_base_calc_importation)
-        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFORMULAS.txt', rubrics_formula)
-        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCAMENTOS_EVENTOS.txt', data_lancamentos_eventos)
-        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCTOMEDIAS.txt', data_lancto_medias)
-        return data_vacation
-
-    def save_rescission(self, inscricao, codi_emp, relacao_empregados):
-        """
-        Salvar dados de rescisão que o RPA irá calcular
-        """
-        # apagar dados já salvos
-        table = DominioRescisao()
-        table.connect(self.BANCO_SQLITE)
-        table.delete().execute()
-
-        # Carregar dados de aviso prévio
-        data_rescission = StorageData()
-        for s2299 in self.dicionario_s2299:
-            cnpj_empregador = self.dicionario_s2299[s2299].get("ideEmpregador").get("nrInsc")
-            cpf_empregado = self.dicionario_s2299[s2299].get("ideVinculo").get("cpfTrab")
-            i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
-
-            if cnpj_empregador != inscricao:
-                continue
-
-            infos = self.dicionario_s2299[s2299].get('infoDeslig')
-            aviso_previo = infos.get('indPagtoAPI')
-            data_fim_aviso = infos.get('dtProjFimAPI')
-            motivo_desligamento = infos.get('mtvDeslig')
-
-            data_rescission.add(aviso_previo, [codi_emp, i_empregados, 'AVISO_PREVIO'])
-            data_rescission.add(data_fim_aviso, [codi_emp, i_empregados, 'DATA_FIM_AVISO'])
-            data_rescission.add(motivo_desligamento, [codi_emp, i_empregados, 'MOTIVO_DESLIGAMENTO'])
-            data_rescission.add('empregado', [codi_emp, i_empregados, 'TIPO'])
-
-        # Carregar contribuintes
-        for s2399 in self.dicionario_s2399:
-            cnpj_empregador = self.dicionario_s2399[s2399].get("ideEmpregador").get("nrInsc")
-            cpf_empregado = self.dicionario_s2399[s2399].get("ideTrabSemVinculo").get("cpfTrab")
-            i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
-
-            if cnpj_empregador != inscricao:
-                continue
-
-            data_rescission.add('contribuinte', [codi_emp, i_empregados, 'TIPO'])
-
-        data = Table('FOAFASTAMENTOS_IMPORTACAO', file=f'{self.DIRETORIO_IMPORTAR}\\FOAFASTAMENTOS_IMPORTACAO.txt')
-        for line in data.items():
-            if format_int(line.get_value('I_AFASTAMENTOS')) == 8:
-                codi_emp = line.get_value('CODI_EMP')
-                i_empregados = line.get_value('I_EMPREGADOS')
-
-                new_line = DominioRescisao()
-                new_line.connect(self.BANCO_SQLITE)
-
-                aviso_previo = data_rescission.get([codi_emp, i_empregados, 'AVISO_PREVIO'])
-                tipo = data_rescission.get([codi_emp, i_empregados, 'TIPO'])
-
-                if tipo == 'empregado':
-                    motivo_desligamento = data_rescission.get([codi_emp, i_empregados, 'MOTIVO_DESLIGAMENTO'])
-                else:
-                    # contribuintes vão por padrão no Domínio com motivo 99 - Outros
-                    motivo_desligamento = '99'
-
-                new_line.codi_emp = codi_emp
-                new_line.i_empregados = i_empregados
-                new_line.competencia = replace_day_date(line.get_value('DATA_REAL'), '%d/%m/%Y', 1)
-                new_line.data_demissao = line.get_value('DATA_REAL')
-                new_line.motivo = motivos_desligamento_esocial.get(motivo_desligamento)
-                new_line.data_pagamento = ''
-
-                if aviso_previo == 'S':
-                    data_fim_aviso = data_rescission.get([codi_emp, i_empregados, 'DATA_FIM_AVISO'])
-                    formated_data_fim_aviso = transform_date(data_fim_aviso, '%Y-%m-%d', '%d/%m/%Y')
-                    dias_projecao_aviso = difference_between_dates(line.get_value('DATA_REAL'), formated_data_fim_aviso, '%d/%m/%Y')
-
-                    new_line.aviso_previo = True
-                    new_line.data_aviso = line.get_value('DATA_REAL')
-                    new_line.dias_projecao_aviso = dias_projecao_aviso+1
-                else:
-                    new_line.aviso_previo = False
-                    new_line.data_aviso = ''
-                    new_line.dias_projecao_aviso = ''
-
-                if not is_null(new_line.motivo):
-                    new_line.save()
-
-    def save_vacation(self, data_vacation):
-        """
-        Salvar dados de férias que o RPA irá calcular
-        """
-        # apagar dados já salvos
-        table = DominioFerias()
-        table.connect(self.BANCO_SQLITE)
-        table.delete().execute()
-
-        data = Table('FOFERIAS_GOZO', file=f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_GOZO.txt')
-        for line in data.items():
-            codi_emp = str(line.get_value('CODI_EMP'))
-            i_empregados = str(line.get_value('I_EMPREGADOS'))
-            competencia = replace_day_date(line.get_value('GOZO_INICIO'), '%d/%m/%Y', 1)
-
-            # Se não encontra nenhum lançamento na competência atual, diminui dois
-            # dias(prazo que as férias devem ser pagas) e tenta pesquisar novamente,
-            # pois o pagamento pode ter sido feito na competência anterior
-            data_rubric = data_vacation.get([codi_emp, i_empregados, competencia])
-            if not data_rubric:
-                data_pagto = add_day_to_date(line.get_value('GOZO_INICIO'), '%d/%m/%Y', -2)
-                previus_competence = replace_day_date(data_pagto, '%d/%m/%Y', 1)
-                data_rubric = data_vacation.get([codi_emp, i_empregados, previus_competence])
-
-            for rubric in data_rubric:
-                new_line = DominioFerias()
-                new_line.connect(self.BANCO_SQLITE)
-
-                new_line.codi_emp = codi_emp
-                new_line.i_empregados = i_empregados
-                new_line.competencia = competencia
-                new_line.inicio_aquisitivo = line.get_value('INICIO_AQUISITIVO')
-                new_line.fim_aquisitivo = line.get_value('FIM_AQUISITIVO')
-                new_line.inicio_gozo = line.get_value('GOZO_INICIO')
-                new_line.fim_gozo = line.get_value('GOZO_FIM')
-                new_line.abono_paga = line.get_value('ABONO_PAGA')
-                new_line.inicio_abono = line.get_value('ABONO_INICIO')
-                new_line.fim_abono = line.get_value('ABONO_FIM')
-                new_line.data_pagamento = line.get_value('DATA_PAGTO')
-                new_line.rubrica = rubric
-                new_line.valor_informado = data_rubric.get(rubric).get('VALOR_INFORMADO')
-                new_line.valor_calculado = data_rubric.get(rubric).get('VALOR_CALCULADO')
-
-                if not is_null(new_line.inicio_gozo):
-                    new_line.save()
-
-    def gerar_afastamentos_importacao(self, inscricao, codi_emp, relacao_empregados):
+    def gerar_afastamentos_importacao(self, relacao_empresas, relacao_empregados):
         """
         Gera o arquivo FOAFASTAMENTOS_IMPORTACAO
         """
         data_foafastamentos_importacao = []
         data_afastamentos_xml_incompleto = StorageData()
         data_afastamentos_xml = StorageData()
-        check_demissao = StorageData()
 
         # Podem vir afastamentos onde a data de início está em um XML e a
         # data fim em outro, dessa forma precisamos organizar os dados e encontrar
@@ -1051,9 +906,6 @@ class eSocialXML():
         for s2230 in self.dicionario_s2230:
             cnpj_empregador = self.dicionario_s2230[s2230].get('ideEmpregador').get('nrInsc')
             cpf_empregado = self.dicionario_s2230[s2230].get('ideVinculo').get('cpfTrab')
-
-            if cnpj_empregador != inscricao:
-                continue
 
             data_inicio = ''
             data_fim = ''
@@ -1117,6 +969,7 @@ class eSocialXML():
             for cpf_empregado in data_afastamentos_xml.get([cnpj_empregador]):
                 for data_inicio in data_afastamentos_xml.get([cnpj_empregador, cpf_empregado]):
                     infos_afastamento = data_afastamentos_xml.get([cnpj_empregador, cpf_empregado, data_inicio])
+                    codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
                     i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
                     if is_null(codi_emp) or is_null(i_empregados):
@@ -1127,9 +980,11 @@ class eSocialXML():
                         data_fim = infos_afastamento.get('fimAfastamento').get('dtTermAfast')
 
                     cod_motivo_esocial = infos_afastamento.get('iniAfastamento').get('codMotAfast')
-                    motivo = motivos_afastamentos_esocial.get(cod_motivo_esocial)
+                    motivos_esocial = get_keys('motivos_afastamentos_esocial')
 
-                    if is_null(motivo):
+                    if cod_motivo_esocial in motivos_esocial:
+                        motivo = motivos_esocial.get(cod_motivo_esocial)
+                    else:
                         continue
 
                     # afastamento por doença ou acidente de trabalho tem o mesmo código no eSocial
@@ -1144,23 +999,21 @@ class eSocialXML():
                         elif motivo == '06':
                             motivo = '18'
 
-                    formated_data_fim = transform_date(data_fim, '%Y-%m-%d', '%d/%m/%Y', default_value_error='NULO')
-                    if is_null(formated_data_fim):
-                        continue
-
                     table = Table('FOAFASTAMENTOS_IMPORTACAO')
 
                     table.set_value('CODI_EMP', codi_emp)
                     table.set_value('I_EMPREGADOS', i_empregados)
                     table.set_value('I_AFASTAMENTOS', motivo)
                     table.set_value('DATA_REAL', transform_date(data_inicio, '%Y-%m-%d', '%d/%m/%Y'))
-                    table.set_value('DATA_FIM', formated_data_fim)
+                    table.set_value('DATA_FIM', transform_date(data_fim, '%Y-%m-%d', '%d/%m/%Y', default_value_error='NULO'))
                     data_foafastamentos_importacao.append(table.do_output())
 
         # demissões empregados
         for s2299 in self.dicionario_s2299:
             cnpj_empregador = self.dicionario_s2299[s2299].get("ideEmpregador").get("nrInsc")
             cpf_empregado = self.dicionario_s2299[s2299].get("ideVinculo").get("cpfTrab")
+
+            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
             if is_null(codi_emp) or is_null(i_empregados):
@@ -1168,40 +1021,37 @@ class eSocialXML():
 
             data_desligamento = self.dicionario_s2299[s2299].get("infoDeslig").get("dtDeslig")
             data_real_demissao = add_day_to_date(data_desligamento, '%Y-%m-%d', 1)
-            if not check_demissao.exist([codi_emp, i_empregados]):
-                table = Table('FOAFASTAMENTOS_IMPORTACAO')
+            table = Table('FOAFASTAMENTOS_IMPORTACAO')
 
-                table.set_value('CODI_EMP', codi_emp)
-                table.set_value('I_EMPREGADOS', i_empregados)
-                table.set_value('I_AFASTAMENTOS', 8)
-                table.set_value('DATA_REAL', data_real_demissao)
-                data_foafastamentos_importacao.append(table.do_output())
-                check_demissao.add('True', [codi_emp, i_empregados])
+            table.set_value('CODI_EMP', codi_emp)
+            table.set_value('I_EMPREGADOS', i_empregados)
+            table.set_value('I_AFASTAMENTOS', 8)
+            table.set_value('DATA_REAL', data_real_demissao)
+            data_foafastamentos_importacao.append(table.do_output())
 
         # demissões contribuintes
         for s2399 in self.dicionario_s2399:
             cnpj_empregador = self.dicionario_s2399[s2399].get("ideEmpregador").get("nrInsc")
             cpf_empregado = self.dicionario_s2399[s2399].get("ideTrabSemVinculo").get("cpfTrab")
+
+            codi_emp = str(relacao_empresas.get(cnpj_empregador).get('codigo'))
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
             if is_null(codi_emp) or is_null(i_empregados):
                 continue
 
             data_demissao = self.dicionario_s2399[s2399].get("infoTSVTermino").get("dtTerm")
+            table = Table('FOAFASTAMENTOS_IMPORTACAO')
 
-            if not check_demissao.exist([codi_emp, i_empregados]):
-                table = Table('FOAFASTAMENTOS_IMPORTACAO')
-
-                table.set_value('CODI_EMP', codi_emp)
-                table.set_value('I_EMPREGADOS', i_empregados)
-                table.set_value('I_AFASTAMENTOS', 8)
-                table.set_value('DATA_REAL', transform_date(data_demissao, '%Y-%m-%d', '%d/%m/%Y'))
-                data_foafastamentos_importacao.append(table.do_output())
-                check_demissao.add('True', [codi_emp, i_empregados])
+            table.set_value('CODI_EMP', codi_emp)
+            table.set_value('I_EMPREGADOS', i_empregados)
+            table.set_value('I_AFASTAMENTOS', 8)
+            table.set_value('DATA_REAL', transform_date(data_demissao, '%Y-%m-%d', '%d/%m/%Y'))
+            data_foafastamentos_importacao.append(table.do_output())
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOAFASTAMENTOS_IMPORTACAO.txt', data_foafastamentos_importacao)
 
-    def gerar_ferias_importacao(self, inscricao, codi_emp, relacao_empregados):
+    def gerar_ferias_importacao(self, relacao_empresas, relacao_empregados):
         """
         Gera os arquivos FOFERIAS_AQUISITIVOS e FOFERIAS_GOZO
         """
@@ -1211,15 +1061,56 @@ class eSocialXML():
         sequencial_aquisitivos = Sequencial()
         sequencial_gozos = Sequencial()
         check_aquisitivos = StorageData()
+        payment_data = StorageData()
 
-        payment_data = self.load_date_payment()
+        # guarda os dados de férias que vem no evento de pagamento
+        for s1210 in self.dicionario_s1210:
+            insc_empresa = self.dicionario_s1210[s1210].get('ideEmpregador').get('nrInsc')
+            cpf_empregado = self.dicionario_s1210[s1210].get('ideBenef').get('cpfBenef')
+
+            competence = self.dicionario_s1210[s1210].get('ideEvento').get('perApur')
+            infos_pagto = self.dicionario_s1210[s1210].get('ideBenef').get('infoPgto')
+
+            # as vezes as informações de pagamento vem em um unico objeto, e
+            # outras vem em uma lista de objetos
+            if isinstance(infos_pagto, dict):
+                data_pagto = infos_pagto.get('dtPgto')
+            elif isinstance(infos_pagto, list):
+                data_pagto = ''
+
+                # percorre a lista de infos sobre o pagamento e coleta a data
+                # de pagamento daquela que for referente a mesma competência
+                for item in infos_pagto:
+                    if item.get('detPgtoFl') is not None:
+                        ref_competence = item.get('detPgtoFl').get('perRef')
+                    else:
+                        ref_competence = item.get('perRef')
+
+                    if competence == ref_competence:
+                        data_pagto = item.get('dtPgto')
+
+                # as vezes em vez da competência vem somente o ano do pagamento
+                # dessa forma coletamos também quando o ano for igual ao da competência
+                if is_null(data_pagto):
+                    for item in infos_pagto:
+                        if item.get('detPgtoFl') is not None:
+                            ref_competence = item.get('detPgtoFl').get('perRef')
+                        else:
+                            ref_competence = item.get('perRef')
+
+                        if not is_null(ref_competence) and len(ref_competence) == 4:
+                            if get_year(competence) == get_year(ref_competence):
+                                data_pagto = item.get('dtPgto')
+                        elif competence == ref_competence:
+                            data_pagto = item.get('dtPgto')
+            else:
+                data_pagto = ''
+
+            payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
 
         for s2230 in self.dicionario_s2230:
             insc_empresa = self.dicionario_s2230[s2230].get('ideEmpregador').get('nrInsc')
             cpf_empregado = self.dicionario_s2230[s2230].get('ideVinculo').get('cpfTrab')
-
-            if insc_empresa != inscricao:
-                continue
 
             infos_afastamento = self.dicionario_s2230[s2230].get("infoAfastamento")
             motivo = infos_afastamento.get('iniAfastamento').get("codMotAfast")
@@ -1227,6 +1118,7 @@ class eSocialXML():
             # Afastamentos de férias é código 15 no eSocial
             if motivo != '15': continue
 
+            codi_emp = str(relacao_empresas.get(insc_empresa).get('codigo'))
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
             if is_null(codi_emp) or is_null(i_empregados):
@@ -1311,7 +1203,7 @@ class eSocialXML():
             table.set_value('ABONO_INICIO', abono_inicio)
             table.set_value('ABONO_FIM', abono_fim)
             table.set_value('DATA_PAGTO', transform_date(data_pagamento, '%Y-%m-%d', '%d/%m/%Y'))
-            table.set_value('PAGA_AD13', 'N')
+            table.set_value('PAGA_AD13', '')
             table.set_value('TIPO', '1')
             table.set_value('GOZO_INICIO_DN', gozo_inicio_dn)
             table.set_value('GOZO_FIM_DN', gozo_fim_dn)
@@ -1320,649 +1212,7 @@ class eSocialXML():
             table.set_value('INICIO_AQUISITIVO', transform_date(data_inicio_aquisitivo, '%Y-%m-%d', '%d/%m/%Y'))
             table.set_value('FIM_AQUISITIVO', transform_date(data_fim_aquisitivo, '%Y-%m-%d', '%d/%m/%Y'))
 
-            table.set_value('MEDIAS_MANUAL', 'N')
-            table.set_value('DIAS_FALTAS', '0')
-            table.set_value('BAIXA_PROV_FERIAS', '0')
-            table.set_value('BAIXA_PROV_ADICFERIAS', '0')
-            table.set_value('BAIXA_PROV_INSS', '0')
-            table.set_value('BAIXA_PROV_FGTS', '0')
-            table.set_value('BAIXA_PROV_PIS', '0')
-            table.set_value('I_PAGTO', 'NULO')
-            table.set_value('DESCONTAR_FALTAS', 'N')
-            table.set_value('I_FERIAS_COLETIVAS', 'NULO')
-            table.set_value('STATUS_ESOCIAL', 'NULO')
-
             data_foferias_gozo.append(table.do_output())
 
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_AQUISITIVOS.txt', data_foferias_aquisitivos)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFERIAS_GOZO.txt', data_foferias_gozo)
-
-    def load_date_payment(self):
-        """
-        Carrega as datas de pagamento do evento 1210
-        """
-        payment_data = StorageData()
-        for s1210 in self.dicionario_s1210:
-            insc_empresa = self.dicionario_s1210[s1210].get('ideEmpregador').get('nrInsc')
-            cpf_empregado = self.dicionario_s1210[s1210].get('ideBenef').get('cpfBenef')
-
-            competence = self.dicionario_s1210[s1210].get('ideEvento').get('perApur')
-            infos_pagto = self.dicionario_s1210[s1210].get('ideBenef').get('infoPgto')
-
-            # as vezes as informações de pagamento vem em um unico objeto, e
-            # outras vem em uma lista de objetos
-            if isinstance(infos_pagto, dict):
-                data_pagto = infos_pagto.get('dtPgto')
-            elif isinstance(infos_pagto, list):
-                data_pagto = ''
-
-                # percorre a lista de infos sobre o pagamento e coleta a data
-                # de pagamento daquela que for referente a mesma competência
-                for item in infos_pagto:
-                    if item.get('detPgtoFl') is not None:
-                        ref_competence = item.get('detPgtoFl').get('perRef')
-                    else:
-                        ref_competence = item.get('perRef')
-
-                    if competence == ref_competence:
-                        data_pagto = item.get('dtPgto')
-
-                # as vezes em vez da competência vem somente o ano do pagamento
-                # dessa forma coletamos também quando o ano for igual ao da competência
-                if is_null(data_pagto):
-                    for item in infos_pagto:
-                        if item.get('detPgtoFl') is not None:
-                            ref_competence = item.get('detPgtoFl').get('perRef')
-                        else:
-                            ref_competence = item.get('perRef')
-
-                        if not is_null(ref_competence) and len(ref_competence) == 4:
-                            if get_year(competence) == get_year(ref_competence):
-                                data_pagto = item.get('dtPgto')
-                        elif competence == ref_competence:
-                            data_pagto = item.get('dtPgto')
-            else:
-                data_pagto = ''
-
-            payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
-
-        return payment_data
-
-    def generate_rubricas_esocial(self, generate_rubrics):
-        """
-        Alimenta o cadastro da rúbrica com os campos que vem do eSocial
-        """
-        rubrics_importation = []
-        for rubric in generate_rubrics:
-
-            i_eventos = int(rubric.get('codigo'))
-            descricao = rubric.get('descricao')
-            tipo = rubric.get('tipo')
-            natureza_tributaria_rubrica = rubric.get('natureza_tributaria_rubrica')
-            incidencia_inss = rubric.get('incidencia_inss_esocial')
-            incidencia_irrf = rubric.get('incidencia_irrf_esocial')
-            incidencia_fgts = rubric.get('incidencia_fgts_esocial')
-            incidencia_sindicato = rubric.get('incidencia_sindical_esocial')
-
-            table = Table('FOEVENTOS')
-            table.set_value('I_EVENTOS', i_eventos)
-            table.set_value('NOME', descricao)
-            table.set_value('PROV_DESC', tipo)
-            table.set_value('NATUREZA_FOLHA_MENSAL', natureza_tributaria_rubrica)
-            table.set_value('CODIGO_INCIDENCIA_INSS_ESOCIAL', incidencia_inss)
-            table.set_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL', incidencia_irrf)
-            table.set_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL', incidencia_fgts)
-            table.set_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL', incidencia_sindicato)
-
-            rubrics_importation.append(table.do_output())
-
-        return rubrics_importation
-
-    def read_companies_rubrics(self, inscricao, codi_emp, handle_lauch_rubrics):
-        """
-        Retorna um dicionário de quais empresas utilizam determinada rúbrica
-        """
-        companies_rubrics = {}
-
-        for line in handle_lauch_rubrics:
-            cnpj_empregador = line.get('nrInsc')
-            i_eventos = int(line.get('codRubr'))
-
-            if cnpj_empregador != inscricao:
-                continue
-
-            # adiciona a rubrica na lista de rubricas utilizadas pela empresa
-            if i_eventos not in companies_rubrics.keys():
-                companies_rubrics[i_eventos] = []
-
-            if int(codi_emp) not in companies_rubrics[i_eventos]:
-                companies_rubrics[i_eventos].append(int(codi_emp))
-
-        return companies_rubrics
-
-    def handle_lauch_rubrics(self):
-        """
-        Faz um tratamento inicial nos dados dos eventos S-1200 para deixá-los todos no mesmo padrão
-        """
-        new_data = []
-        for s1200 in self.dicionario_s1200:
-            infos_pagto = self.dicionario_s1200[s1200].get('dmDev')
-            itens_to_handle = []
-            if isinstance(infos_pagto, list):
-                itens_to_handle.extend(infos_pagto)
-            else:
-                itens_to_handle.append(infos_pagto)
-
-            for item in itens_to_handle:
-                dm_dev = item.get('ideDmDev')
-                infos_events = item.get('infoPerApur').get('ideEstabLot').get('remunPerApur').get('itensRemun')
-
-                events_to_handle = []
-                if isinstance(infos_events, list):
-                    events_to_handle.extend(infos_events)
-                else:
-                    events_to_handle.append(infos_events)
-
-                for line in events_to_handle:
-                    new_line = dict()
-                    new_line['nrInsc'] = self.dicionario_s1200[s1200].get('ideEmpregador').get('nrInsc')
-                    new_line['cpfTrab'] = self.dicionario_s1200[s1200].get('ideTrabalhador').get('cpfTrab')
-                    new_line['perApur'] = self.dicionario_s1200[s1200].get('ideEvento').get('perApur')
-                    new_line['ideDmDev'] = dm_dev
-                    new_line['codRubr'] = line.get('codRubr')
-                    new_line['fatorRubr'] = line.get('fatorRubr')
-                    new_line['vrRubr'] = line.get('vrRubr')
-
-                    new_data.append(new_line)
-
-        return new_data
-
-    def read_rescission_rubrics(self, handle_lauch_rubrics):
-        """
-        Em alguns eventos S-2299 vem informadas algumas verbas rescisórias, então juntamos essas verbas
-        na lista de lançamentos que precisam ser feitos
-        """
-        for s2299 in self.dicionario_s2299:
-            infos_pagto = self.dicionario_s2299[s2299].get('infoDeslig').get('verbasResc')
-
-            if infos_pagto is not None:
-
-                items_to_handle = []
-                if isinstance(infos_pagto.get('dmDev'), list):
-                    items_to_handle.extend(infos_pagto.get('dmDev'))
-                else:
-                    items_to_handle.append(infos_pagto.get('dmDev'))
-
-                for item in items_to_handle:
-                    dm_dev = item.get('ideDmDev')
-
-                    infos_events = item.get('infoPerApur').get('ideEstabLot').get('detVerbas')
-
-                    events_to_handle = []
-                    if isinstance(infos_events, list):
-                        events_to_handle.extend(infos_events)
-                    else:
-                        events_to_handle.append(infos_events)
-
-                    for line in events_to_handle:
-                        new_line = dict()
-                        new_line['nrInsc'] = self.dicionario_s2299[s2299].get('ideEmpregador').get('nrInsc')
-                        new_line['cpfTrab'] = self.dicionario_s2299[s2299].get('ideVinculo').get('cpfTrab')
-                        new_line['perApur'] = get_competence(self.dicionario_s2299[s2299].get('infoDeslig').get('dtDeslig'))
-                        new_line['ideDmDev'] = dm_dev
-                        new_line['codRubr'] = line.get('codRubr')
-                        new_line['fatorRubr'] = line.get('qtdRubr')
-                        new_line['vrRubr'] = line.get('vrRubr')
-
-                        handle_lauch_rubrics.append(new_line)
-
-    def complete_data_rubrics(self, rubrics_esocial, companies_rubrics, rubrics_relationship, rubrics_averages):
-        """
-        Complementa a tabela de rúbricas com alguma equivalente do contábil, e gera também as bases de cálculo
-        e fórmulas necessárias
-        """
-        # campos que virão dos dados do eSocial
-        not_overwrite_keys = [
-            'NOME',
-            'PROV_DESC',
-            'NATUREZA_FOLHA_MENSAL',
-            'CODIGO_INCIDENCIA_INSS_ESOCIAL',
-            'CODIGO_INCIDENCIA_IRRF_ESOCIAL',
-            'CODIGO_INCIDENCIA_FGTS_ESOCIAL',
-            'CODIGO_INCIDENCIA_SINDICAL_ESOCIAL'
-        ]
-        sybase = Sybase(self.base_dominio, self.usuario_dominio, self.senha_dominio)
-        connection = sybase.connect()
-
-        data_rubrics, data_base_calc_rubrics, data_formula_rubrics = sybase.select_data_rubrics(connection, self.empresa_padrao_rubricas)
-        uses_company_rubrics = sybase.select_companies_to_use_rubrics(connection)
-        dominio_rubrics = sybase.select_rubrics(connection)
-        dominio_rubrics_esocial = sybase.select_codigo_esocial_rubrics(connection)
-        cnpj_companies = sybase.select_cnpj_companies(connection)
-
-        rubrics_importation = []
-        rubrics_base_calc_importation = []
-        rubrics_formula = []
-        check_importated_rubrics = StorageData()
-        for line_rubric in rubrics_esocial:
-            i_eventos = line_rubric.get('I_EVENTOS')
-            if i_eventos in companies_rubrics.keys():
-                for codi_emp in companies_rubrics.get(i_eventos):
-                    table = Table('FOEVENTOS')
-
-                    rubric_calc_base = {}
-                    rubric_formula = {}
-
-                    natureza_folha_mensal = line_rubric.get('NATUREZA_FOLHA_MENSAL')
-                    if natureza_folha_mensal in data_rubrics.keys():
-
-                        natureza_folha_mensal_dominio, index_rubric = self.search_similar_rubric(line_rubric, data_rubrics)
-                        if index_rubric:
-
-                            # copiar campos da rubrica do Domínio
-                            for column in data_rubrics[natureza_folha_mensal_dominio][index_rubric]:
-                                column_value = data_rubrics[natureza_folha_mensal_dominio][index_rubric][column]
-                                if not is_null(column_value) and str(column_value) != 'None':
-                                    table.set_value(column, column_value)
-
-                            # Copiar base de cálculo e fórmula se tiver
-                            if table.get_value('I_EVENTOS') in data_base_calc_rubrics.keys():
-                                rubric_calc_base = data_base_calc_rubrics[table.get_value('I_EVENTOS')]
-
-                            if table.get_value('I_EVENTOS') in data_formula_rubrics.keys():
-                                rubric_formula = data_formula_rubrics[table.get_value('I_EVENTOS')]
-
-                    # copiar campos que vem dos dados do eSocial
-                    for field in not_overwrite_keys:
-                        table.set_value(field, line_rubric.get(field))
-
-                    # Algumas empresas podem replicar rubricas de outras, aqui buscamos o código da empresa
-                    # onde a rubrica deve ser importada
-                    codi_emp_eve = uses_company_rubrics.get(codi_emp)
-
-                    # checa se rubrica já não foi criada na empresa
-                    if not check_importated_rubrics.exist([codi_emp_eve, i_eventos]):
-                        check_importated_rubrics.add('True', [codi_emp_eve, i_eventos])
-
-                        table.set_value('CODI_EMP', codi_emp_eve)
-                        table.set_value('NOME', format_name_rubric(line_rubric.get('NOME')))
-
-                        i_eventos_importation, codigo_esocial = self.generate_i_evento(codi_emp_eve, dominio_rubrics, dominio_rubrics_esocial, cnpj_companies)
-                        table.set_value('I_EVENTOS', i_eventos_importation)
-                        table.set_value('CODIGO_ESOCIAL', codigo_esocial)
-
-                        # salva o relacionamento da rúbrica
-                        rubrics_relationship.add(i_eventos_importation, [str(codi_emp_eve), str(i_eventos)])
-
-                        # se tiver incidência no IRRF, marca a rubrica para compor a DIRF
-                        if format_int(table.get_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL')) in [11, 12, 13]:
-                            table.set_value('SOMA_INF_REN', 'S')
-                            table.set_value('REND_TRIBUTAVEIS', '1')
-                        else:
-                            table.set_value('SOMA_INF_REN', 'N')
-                            table.set_value('REND_TRIBUTAVEIS', '0')
-
-                        # preenche alguns campos padrões para a rúbrica
-                        for key in campos_padra_rubrica.keys():
-                            if is_null(table.get_value(key)):
-                                table.set_value(key, campos_padra_rubrica.get(key))
-
-                        rubrics_importation.append(table.do_output())
-
-                        # checa se a rubrica deve entrar para médias
-                        if str(table.get_value('SOMA_MEDIA_AVISO_PREVIO')) == '1':
-                            if str(table.get_value('SOMA_MED_13')) == 'S':
-                                if str(table.get_value('SOMA_MED_FER')) == 'S':
-                                    if str(table.get_value('SOMA_MEDIA_LICENCA_PREMIO')) == '1':
-                                        if str(table.get_value('SOMA_MED_AFAST')) == 'S':
-                                            if str(table.get_value('SOMA_MEDIA_SALDO_SALARIO')) == '1':
-                                                if str(table.get_value('I_EVENTOS')) not in rubrics_averages:
-                                                    rubrics_averages.append(str(table.get_value('I_EVENTOS')))
-
-                        # para os tipos de rubricas que possuem formula
-                        if rubric_formula:
-                            table_formula = Table('FOFORMULAS')
-                            table_formula.set_value('CODI_EMP', table.get_value('CODI_EMP'))
-                            table_formula.set_value('I_EVENTOS', table.get_value('I_EVENTOS'))
-                            table_formula.set_value('SCRIPT', rubric_formula.get('SCRIPT'))
-                            table_formula.set_value('FIL1', rubric_formula.get('FIL1'))
-                            table_formula.set_value('FIL2', rubric_formula.get('FIL2'))
-                            table_formula.set_value('FIL3', rubric_formula.get('FIL3'))
-                            table_formula.set_value('FIL4', rubric_formula.get('FIL4'))
-                            rubrics_formula.append(table_formula.do_output())
-
-                        # gera as bases de cálculo para a rúbrica
-                        incidencia_inss = table.get_value('CODIGO_INCIDENCIA_INSS_ESOCIAL')
-                        incidencia_irrf = table.get_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL')
-                        incidencia_fgts = table.get_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL')
-                        incidencia_sindical = table.get_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL')
-
-                        # marca qual base de INSS precisa ser gerada conforme a incidência da rubrica
-                        base_inss_mensal, base_inss_empresa_mensal, base_inss_terceiros_mensal, base_inss_rat_mensal = get_incidencia_inss(incidencia_inss)
-
-                        # marca qual base de IRRF precisa ser gerada conforme a incidência da rubrica
-                        base_irrf = get_incidencia_irrf(incidencia_irrf)
-
-                        # marca qual base de FGTS precisa ser gerada conforme a incidência da rubrica
-                        base_fgts = get_incidencia_fgts(incidencia_fgts)
-
-                        if rubric_calc_base:
-                            for base_calc in rubric_calc_base:
-                                if not is_a_valid_base(incidencia_irrf, incidencia_inss, incidencia_fgts, incidencia_sindical, base_calc['I_CADBASES']):
-                                    continue
-
-                                # se a rubrica já tiver a base, não precisa ser gerada
-                                if base_inss_mensal == format_int(base_calc['I_CADBASES']):
-                                    base_inss_mensal = False
-
-                                if base_inss_empresa_mensal == format_int(base_calc['I_CADBASES']):
-                                    base_inss_empresa_mensal = False
-
-                                if base_inss_terceiros_mensal == format_int(base_calc['I_CADBASES']):
-                                    base_inss_terceiros_mensal = False
-
-                                if base_inss_rat_mensal == format_int(base_calc['I_CADBASES']):
-                                    base_inss_rat_mensal = False
-
-                                if base_irrf == format_int(base_calc['I_CADBASES']):
-                                    base_irrf = False
-
-                                if base_fgts == format_int(base_calc['I_CADBASES']):
-                                    base_fgts = False
-
-                                table_calc = Table('FOEVENTOSBASES')
-                                table_calc.set_value('CODI_EMP', table.get_value('CODI_EMP'))
-                                table_calc.set_value('I_EVENTOS', table.get_value('I_EVENTOS'))
-                                table_calc.set_value('I_CADBASES', base_calc['I_CADBASES'])
-                                table_calc.set_value('ENVIAR_ESOCIAL', base_calc['ENVIAR_ESOCIAL'])
-                                table_calc.set_value('INCLUSAO_VALIDADA_ESOCIAL', base_calc['INCLUSAO_VALIDADA_ESOCIAL'])
-                                table_calc.set_value('GERAR_RETIFICACAO_ESOCIAL', base_calc['GERAR_RETIFICACAO_ESOCIAL'])
-                                table_calc.set_value('PROCESSAR_EXCLUSAO_ESOCIAL', base_calc['PROCESSAR_EXCLUSAO_ESOCIAL'])
-                                table_calc.set_value('I_DADOS_EVENTOS_ESOCIAL', 'NULO')
-                                table_calc.set_value('I_LOTE_ESOCIAL', 'NULO')
-                                table_calc.set_value('STATUS_ESOCIAL', 'NULO')
-                                table_calc.set_value('COMPANY_ID', base_calc['COMPANY_ID'])
-
-                                rubrics_base_calc_importation.append(table_calc.do_output())
-
-                        # gera a base de calculo se a rubrica tiver com determinada incidência marcada
-                        if base_inss_mensal:
-                            default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_inss_mensal)
-                            rubrics_base_calc_importation.append(default_base)
-
-                        if base_inss_empresa_mensal:
-                            default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_inss_empresa_mensal)
-                            rubrics_base_calc_importation.append(default_base)
-
-                        if base_inss_terceiros_mensal:
-                            default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_inss_terceiros_mensal)
-                            rubrics_base_calc_importation.append(default_base)
-
-                        if base_inss_rat_mensal:
-                            default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_inss_rat_mensal)
-                            rubrics_base_calc_importation.append(default_base)
-
-                        if base_irrf:
-                            default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_irrf)
-                            rubrics_base_calc_importation.append(default_base)
-
-                        if base_fgts:
-                            default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_fgts)
-                            rubrics_base_calc_importation.append(default_base)
-
-        return rubrics_importation, rubrics_base_calc_importation, rubrics_formula
-
-    def search_similar_rubric(self, rubric, data_rubrics):
-        """
-        Procura uma rúbrica da Domínio o mais similar possível com a rúbrica da importação
-        e retorna os campos NATUREZA_FOLHA_MENSAL e I_EVENTOS da rubrica encontrada
-        """
-        natureza_folha_mensal_dominio = ''
-        index_rubric = ''
-
-        fields_to_compare = [
-            'PROV_DESC',
-            'CODIGO_INCIDENCIA_INSS_ESOCIAL',
-            'CODIGO_INCIDENCIA_IRRF_ESOCIAL',
-            'CODIGO_INCIDENCIA_FGTS_ESOCIAL',
-            'CODIGO_INCIDENCIA_SINDICAL_ESOCIAL'
-        ]
-
-        # Vai checando qual a rúbrica com mais tem campos iguais
-        natureza_folha_mensal = rubric.get('NATUREZA_FOLHA_MENSAL')
-        if str(natureza_folha_mensal) not in 'NULO' and natureza_folha_mensal in data_rubrics.keys():
-            if len(data_rubrics[natureza_folha_mensal]) > 1:
-                old_advance = 0
-                for dominio_rubric in data_rubrics[natureza_folha_mensal]:
-                    advance = 0
-                    for number_field, field in enumerate(fields_to_compare):
-                        if str(dominio_rubric.get(field)) == str(rubric.get(field)):
-                            advance += 1
-                            if len(fields_to_compare) == (number_field+1):
-                                natureza_folha_mensal_dominio = dominio_rubric.get('NATUREZA_FOLHA_MENSAL')
-                                index_rubric = data_rubrics[natureza_folha_mensal].index(dominio_rubric)
-                        else:
-                            if advance > old_advance:
-                                natureza_folha_mensal_dominio = dominio_rubric.get('NATUREZA_FOLHA_MENSAL')
-                                index_rubric = data_rubrics[natureza_folha_mensal].index(dominio_rubric)
-                                old_advance = int(advance)
-
-        return natureza_folha_mensal_dominio, index_rubric
-
-    def generate_i_evento(self, codi_emp_eventos, dominio_rubrics, dominio_rubrics_esocial, cnpj_companies):
-        """
-        Gera um código de evento válido, dentro do range permitido(maior que 201).
-        E retorna o código da rubrica e o código eSocial
-        """
-        i_evento = 201
-        codigo_esocial = 201
-        raiz_cnpj = str(cnpj_companies[codi_emp_eventos])[0:8]
-
-        while True:
-            if i_evento in dominio_rubrics[codi_emp_eventos]:
-                i_evento += 1
-            else:
-                codigo_esocial = i_evento
-                while True:
-                    if str(codigo_esocial) in dominio_rubrics_esocial[raiz_cnpj]:
-                        codigo_esocial += 1
-                    else:
-                        break
-                break
-
-        dominio_rubrics[codi_emp_eventos].append(i_evento)
-        dominio_rubrics_esocial[raiz_cnpj].append(str(codigo_esocial))
-        return i_evento, codigo_esocial
-
-
-def get_incidencia_inss(incidencia):
-    """
-    Retorna os códigos de bases respectivos de cada incidência de base de INSS
-    """
-    base_inss_mensal = False
-    base_inss_empresa_mensal = False
-    base_inss_terceiros_mensal = False
-    base_inss_rat_mensal = False
-
-    if format_int(incidencia) in [11, 12, 13]:
-        base_inss_mensal, base_inss_empresa_mensal, base_inss_terceiros_mensal, base_inss_rat_mensal = incidencias_bases_INSS.get(str(incidencia))
-
-    return base_inss_mensal, base_inss_empresa_mensal, base_inss_terceiros_mensal, base_inss_rat_mensal
-
-
-def get_incidencia_irrf(incidencia):
-    """
-    Retorna os códigos de bases respectivos de cada incidência de base de IRRF
-    """
-    base_irrf = False
-
-    if format_int(incidencia) in [11, 12, 13]:
-        base_irrf = incidencias_bases_IRRF.get(str(incidencia))[0]
-
-    return base_irrf
-
-
-def get_incidencia_fgts(incidencia):
-    """
-    Retorna os códigos de bases respectivos de cada incidência de base de FGTS
-    """
-    base_fgts = False
-
-    if format_int(incidencia) in [11, 12]:
-        base_fgts = incidencias_bases_FGTS.get(str(incidencia))[0]
-
-    return base_fgts
-
-
-def check_inss_irrf_fgts_base(tipo, incidencia, i_cad_base):
-    """
-    Checa se a base de INSS, IRRF e FGTS estão de acordo com a incidência da rubrica.
-    Exemplo: rubrica está com incidência de IRRF mensal marcada e tem uma base de IRRF férias.
-    """
-    formated_i_cad_base = format_int(i_cad_base)
-    if tipo == 'IRRF':
-        if str(incidencia) in incidencias_bases_IRRF.keys():
-            if formated_i_cad_base in get_all_incidencias('IRRF'):
-                return formated_i_cad_base == get_incidencia_irrf(incidencia)
-            else:
-                return True
-        else:
-            return True
-    if tipo == 'INSS':
-        if str(incidencia) in incidencias_bases_INSS.keys():
-            if formated_i_cad_base in get_all_incidencias('INSS'):
-                return formated_i_cad_base in get_incidencia_inss(incidencia)
-            else:
-                return True
-        else:
-            return True
-    if tipo == 'FGTS':
-        if str(incidencia) in incidencias_bases_FGTS.keys():
-            if formated_i_cad_base in get_all_incidencias('FGTS'):
-                return formated_i_cad_base == get_incidencia_fgts(incidencia)
-            else:
-                return True
-        else:
-            return True
-
-
-def get_all_incidencias(tipo):
-    """
-    Retorna todos os códigos de bases que podem ser incidências de IRRF, FGTS ou INSS
-    """
-    result = []
-    values = []
-    if tipo == 'INSS':
-        values = incidencias_bases_INSS.values()
-    elif tipo == 'IRRF':
-        values = incidencias_bases_IRRF.values()
-    elif tipo == 'FGTS':
-        values = incidencias_bases_FGTS.values()
-
-    for lista_bases in values:
-        result.extend(lista_bases)
-
-    return result
-
-
-def ignore_base_calc(base, base_calc):
-    """"
-    Função para validar se a base de calculo é uma base referente a IRRF, INSS, FGTS ou Sindical
-    """
-    if base in 'IRRF':
-        if int(base_calc) in i_cadbases_irrf:
-            return True
-
-    if base in 'INSS':
-        if int(base_calc) in i_cadbases_inss:
-            return True
-
-    if base in 'FGTS':
-        if int(base_calc) in i_cadbases_fgts:
-            return True
-
-    if base in 'SINDICAL':
-        if int(base_calc) == 6:
-            return True
-
-    return False
-
-def is_a_valid_base(incidencia_irrf, incidencia_inss, incidencia_fgts, incidencia_sindical, i_cadbases):
-    """
-    Valida se o código da base está valida de acordo com a incidência da rúbrica
-    """
-    # se tiver desmarcada a incidência de IRRF, retira as bases de calculo referente ao IRRF
-    if not is_null(incidencia_irrf):
-        if format_int(incidencia_irrf) in [0, 9]:
-            if ignore_base_calc('IRRF', i_cadbases):
-                return False
-        else:
-            if not check_inss_irrf_fgts_base('IRRF', incidencia_irrf, i_cadbases):
-                return False
-
-    # se tiver desmarcada a incidência de INSS, retira as bases de calculo referente ao INSS
-    if not is_null(incidencia_inss):
-        if format_int(incidencia_inss) in [0]:
-            if ignore_base_calc('INSS', i_cadbases):
-                return False
-        else:
-            if not check_inss_irrf_fgts_base('INSS', incidencia_inss, i_cadbases):
-                return False
-
-    # se tiver desmarcada a incidência de FGTS, retira as bases de calculo referente ao FGTS
-    if not is_null(incidencia_fgts):
-        if format_int(incidencia_fgts) in [0]:
-            if ignore_base_calc('FGTS', i_cadbases):
-                return False
-        else:
-            if not check_inss_irrf_fgts_base('FGTS', incidencia_fgts, i_cadbases):
-                return False
-
-    # se tiver desmarcada a incidência SINDICAL, retira as bases de calculo referente ao sindicato
-    if not is_null(incidencia_sindical):
-        if format_int(incidencia_sindical) in [0]:
-            if ignore_base_calc('SINDICAL', i_cadbases):
-                return False
-
-    return True
-
-
-def generate_default_base(codi_emp, i_eventos, i_cadbases):
-    """
-    Gerar um registro padrão da tabela FOEVENTOSBASES com os dados passados por parâmetro
-    """
-    table_calc = Table('FOEVENTOSBASES')
-    table_calc.set_value('CODI_EMP', codi_emp)
-    table_calc.set_value('I_EVENTOS', i_eventos)
-    table_calc.set_value('I_CADBASES', i_cadbases)
-    table_calc.set_value('ENVIAR_ESOCIAL', 1)
-    table_calc.set_value('INCLUSAO_VALIDADA_ESOCIAL', 0)
-    table_calc.set_value('GERAR_RETIFICACAO_ESOCIAL', 0)
-    table_calc.set_value('PROCESSAR_EXCLUSAO_ESOCIAL', 0)
-    table_calc.set_value('I_DADOS_EVENTOS_ESOCIAL', 'NULO')
-    table_calc.set_value('I_LOTE_ESOCIAL', 'NULO')
-    table_calc.set_value('STATUS_ESOCIAL', 'NULO')
-    table_calc.set_value('COMPANY_ID', '00000000000000000000000000000000')
-
-    return table_calc.do_output()
-
-
-def load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_rubrics_relationship, uses_company_rubrics):
-    for i_eventos in companies_rubrics:
-        for codi_emp in companies_rubrics.get(i_eventos):
-            codi_emp_eve = uses_company_rubrics.get(codi_emp)
-
-            i_eventos_importation = general_rubrics_relationship.get(i_eventos)
-            rubrics_relationship.add(i_eventos_importation, [str(codi_emp_eve), str(i_eventos)])
-
-
-def get_codi_emp(engine, inscricao):
-    """
-    Recupera o código de uma empresa com base em sua inscrição
-    """
-    codi_emp = ''
-    df = pd.read_sql(f'SELECT codi_emp FROM EMPRESAS WHERE inscricao = {inscricao}', con=engine)
-    for index in range(len(df)):
-        codi_emp = df.loc[index, "codi_emp"]
-
-    return codi_emp

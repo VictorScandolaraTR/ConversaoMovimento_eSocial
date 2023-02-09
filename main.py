@@ -312,12 +312,12 @@ class eSocial(QMainWindow):
         esocial.configura_conexao_esocial(usuario, senha, certificado, tipo)
         esocial.baixar_dados_esocial()
         
-        '''self.atualiza_status("Lendo informações...")
+        self.atualiza_status("Lendo informações...")
         esocial.extrair_arquivos_xml()
         esocial.carregar_informacoes_xml()
 
         self.atualiza_status("Dados carregados do e-Social","E")
-        self.seleciona_registro()'''
+        self.seleciona_registro()
 
 
     def relaciona_empresa_dominio(self):
