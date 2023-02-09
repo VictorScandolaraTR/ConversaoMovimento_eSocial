@@ -311,12 +311,12 @@ class eSocialXML():
         """
         data_employees = {}
 
-        engine = create_engine("sybase+pyodbc://{user}:{pw}@{dsn}".format(user=self.usuario_dominio, pw=self.senha_dominio, dsn=self.base_dominio))
+        sybase = Sybase(self.base_dominio, self.usuario_dominio, self.senha_dominio)
+        connection = sybase.connect()
 
-        sql = "SELECT CODI_EMP, I_EMPREGADOS, CPF FROM BETHADBA.FOEMPREGADOS"
-        df_empregados = pd.read_sql(sql, con=engine)
+        sybase_employees = sybase.select_employees(connection)
 
-        for index, line in df_empregados.iterrows():
+        for line in sybase_employees:
             codi_emp = str(line.get('CODI_EMP'))
             i_empregados = str(line.get('I_EMPREGADOS'))
             cpf = str(line.get('CPF'))

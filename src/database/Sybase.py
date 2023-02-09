@@ -570,3 +570,23 @@ class Sybase:
 
         except:
             return False
+
+    def select_employees(self, connection):
+        """
+        Seleciona os CPFs dos empregados do banco
+        """
+        cursor = connection.cursor()
+
+        try:
+            cursor.execute('SELECT CODI_EMP, I_EMPREGADOS, CPF FROM BETHADBA.FOEMPREGADOS')
+
+            header = [i[0] for i in cursor.description]
+            rows = cursor.fetchall()
+
+            result = []
+            for row in rows:
+                result.append(dict(zip(header, row)))
+
+            return result
+        except:
+            return False
