@@ -33,6 +33,7 @@ class Agent:
     DEFAULT_PASSWORD = 'gerente'
     BASE_NAME_USER = 'Conversao'
     DEFAULT_PASSWORD_CREATED = '123456'
+    path_def = '.\\def_tables.db'
 
     def config_log(self):
         """
@@ -235,8 +236,8 @@ class Agent:
                 # preparar dados de férias e afastamentos
                 if import_vacation or import_removals or finish_process:
                     if not debug:
-                        self.__data_vacation = Table('FOFERIAS_GOZO', file=f'{self.__path_run}\\prontos\\FOFERIAS_GOZO.txt').items()
-                        self.__data_removals = Table('FOAFASTAMENTOS_IMPORTACAO', file=f'{self.__path_run}\\prontos\\FOAFASTAMENTOS_IMPORTACAO.txt').items()
+                        self.__data_vacation = Table('FOFERIAS_GOZO', file=f'{self.__path_run}\\prontos\\FOFERIAS_GOZO.txt', path_def=self.path_def).items()
+                        self.__data_removals = Table('FOAFASTAMENTOS_IMPORTACAO', file=f'{self.__path_run}\\prontos\\FOAFASTAMENTOS_IMPORTACAO.txt', path_def=self.path_def).items()
 
                         vacation_import, removals_import = self.remove_entries(self.__data_vacation, self.__data_removals)
                         removals_import_last = self.separate_data_removals(self.__data_removals)
@@ -665,7 +666,7 @@ class Agent:
             ignore_companies = check_companies_calc(self.__database, self.__username, self.__password)
 
             # dados de holerites
-            data = Table('FOLANCAMENTOS_EVENTOS', file=f'{self.__path_run}\\Importar\\FOLANCAMENTOS_EVENTOS.txt')
+            data = Table('FOLANCAMENTOS_EVENTOS', file=f'{self.__path_run}\\Importar\\FOLANCAMENTOS_EVENTOS.txt', path_def=self.path_def)
             for item in data.items():
                 codi_emp = int(item.get_value('CODI_EMP'))
                 i_empregados = item.get_value('I_EMPREGADOS')
@@ -1628,7 +1629,7 @@ class Agent:
                         continue
 
                 importation = True
-                table = Table('FOFERIAS_LANCAMENTOS')
+                table = Table('FOFERIAS_LANCAMENTOS', path_def=self.path_def)
                 table.set_value('CODI_EMP', int(line['codi_emp']))
                 table.set_value('I_EMPREGADOS', int(line['i_empregados']))
                 table.set_value('I_EVENTOS', line['rubrica'])
@@ -2200,7 +2201,7 @@ class Agent:
                     except:
                         continue
                     if init_date_removal >= self.__init_competence:
-                        if int(line['I_AFASTAMENTOS']) != 8:
+                        if int(line.get_value('I_AFASTAMENTOS')) != 8:
                             new_data_removals.append(line.do_output())
 
             return new_data_removals
