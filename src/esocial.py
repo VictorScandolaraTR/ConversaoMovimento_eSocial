@@ -898,6 +898,7 @@ class eSocialXML():
                     table.set_value('COMPETENCIA', transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y'))
                     table.set_value('I_EVENTOS', i_eventos)
                     table.set_value('VALOR', valor_calculado)
+                    table.set_value('I_FERIAS_GOZO', 'NULO')
 
                     data_lancto_medias.append(table.do_output())
 
@@ -905,7 +906,7 @@ class eSocialXML():
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOEVENTOSBASES.txt', rubrics_base_calc_importation)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOFORMULAS.txt', rubrics_formula)
         print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCAMENTOS_EVENTOS.txt', data_lancamentos_eventos)
-        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCTO_MEDIAS.txt', data_lancto_medias)
+        print_to_import(f'{self.DIRETORIO_IMPORTAR}\\FOLANCTOMEDIAS.txt', data_lancto_medias)
         return data_vacation
 
     def save_rescission(self, inscricao, codi_emp, relacao_empregados):
