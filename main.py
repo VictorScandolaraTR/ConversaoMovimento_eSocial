@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import QApplication, QMainWindow, QDialog, QTableWidgetItem
-from PySide6.QtCore import Signal, QThread
+from PySide6.QtWidgets import QApplication, QMainWindow, QDialog, QTableWidgetItem, QMessageBox
+from PySide6.QtCore import Signal, QThread, Qt
+from PySide6 import QtGui
 from sqlalchemy import create_engine, Table, update
 import src.utils.components as components
 import pandas as pd
@@ -123,16 +124,23 @@ class eSocial(QMainWindow):
 
                 linha = linha + 1
 
+    def alerta(self, mensagem, titulo = "Atenção"):
+        msg = QMessageBox()
+        msg.setWindowTitle(titulo)
+        msg.setText(mensagem)
+        msg.exec()
+
     def adiciona_empresa(self):
         os.system(f"mkdir {self.__diretorio_trabalho}")
         proxima_linha = len(self.__empresas)
         inscricao = self.__edit_inscricao.text()
 
         if (inscricao == ""):
-            print("Preencha o campo inscrição.")
+            self.alerta("Preencha o campo inscrição.","Erro ao adicionar")
             return
         if (inscricao in self.__empresas_em_uso):
-            print("Empresa já cadastrada.")
+            self.alerta("Empresa já cadastrada.", "Erro ao adicionar")
+            self.__edit_inscricao.clear()
             return
 
         os.system(f"mkdir {self.__diretorio_trabalho}\\{inscricao}")
@@ -300,17 +308,28 @@ class eSocial(QMainWindow):
             conexao.execute(f"UPDATE EMPRESAS SET status = '{status_bd}' WHERE inscricao = '{inscricao}'")
 
     def acessa_portal_esocial(self):
-        self.atualiza_status("Buscando dados do e-Social...")
         indice = str(self.__tabela_empresas.selectedItems()[0].row())
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
         esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
+        esocial.completar_inscricao()
+        self.atualiza_status("Buscando dados do e-Social...")
+        mensagem_alerta = "IMPORTANTE!\n"\
+            "Será aberto um navegador no portal e-Social para que você selecione o certificado da empresa correta para autenticação.\n"\
+            "Após a autenticação, o navegador será minimizado e será encerrado automaticamente após o fim do processo."
+        self.alerta(mensagem_alerta)
 
-        usuario = self.__empresas.get(indice).get("usuario_esocial")
-        senha = self.__empresas.get(indice).get("senha_esocial")
-        tipo = self.__empresas.get(indice).get("tipo_certificado_esocial")
-        certificado = self.__empresas.get(indice).get("certificado_esocial")
-        esocial.configura_conexao_esocial(usuario, senha, certificado, tipo)
-        esocial.baixar_dados_esocial()
+        lotes = esocial.baixar_dados_esocial()
+        lotes_erro = lotes["Erro"]
+        lotes_vazios = lotes ["Nenhum evento encontrado"]
+        lotes_baixados = lotes["Disponível para Baixar"]
+        total_lotes = lotes_erro + lotes_vazios + lotes_baixados
+        self.alerta(
+            f"Acesso ao portal encerrado.\n"\
+            f"Consultas realizadas: {total_lotes}\n"\
+            f"Consultas com resultado: {lotes_baixados}\n"\
+            f"Consultas sem resultado: {lotes_baixados}\n"\
+            f"Consultas com erro: {lotes_erro}\n"\
+        )
         
         self.atualiza_status("Lendo informações...")
         esocial.extrair_arquivos_xml()
@@ -465,11 +484,11 @@ class eSocialConfiguracoes(QMainWindow):
         self.__btn_cancelar = self.__window.btn_concertar_configuracoes
         self.__btn_confirmar_configuracoes = self.__window.btn_confirmar_configuracoes
 
-        self.__edit_usuario_certificado = self.__window.edit_usuario_certificado
-        self.__edit_senha_certificado = self.__window.edit_senha_certificado
-        self.__combo_tipo_certificado = self.__window.combo_tipo_certificado
-        self.__edit_caminho_certificado = self.__window.edit_caminho_certificado
-        self.__btn_busca_certificado = self.__window.btn_busca_certificado
+        #self.__edit_usuario_certificado = self.__window.edit_usuario_certificado
+        #self.__edit_senha_certificado = self.__window.edit_senha_certificado
+        #self.__combo_tipo_certificado = self.__window.combo_tipo_certificado
+        #self.__edit_caminho_certificado = self.__window.edit_caminho_certificado
+        #self.__btn_busca_certificado = self.__window.btn_busca_certificado
 
         self.__edit_banco_dominio = self.__window.edit_banco_dominio
         self.__edit_usuario_dominio = self.__window.edit_usuario_dominio
@@ -479,14 +498,14 @@ class eSocialConfiguracoes(QMainWindow):
         self.__edit_usuario_sgd = self.__window.edit_usuario_sgd
         self.__edit_senha_sgd = self.__window.edit_senha_sgd
 
-        self.__btn_busca_certificado.clicked.connect(self.busca_certificado)
+        #self.__btn_busca_certificado.clicked.connect(self.busca_certificado)
         self.__btn_cancelar.clicked.connect(self.close)
         self.__btn_confirmar_configuracoes.clicked.connect(self.salvar)
 
-        self.__edit_usuario_certificado.setText(configuracao["usuario_esocial"])
-        self.__edit_senha_certificado.setText(configuracao["senha_esocial"])
-        self.__combo_tipo_certificado.setCurrentText(configuracao["tipo_certificado_esocial"])
-        self.__edit_caminho_certificado.setText(configuracao["certificado_esocial"])
+        #self.__edit_usuario_certificado.setText(configuracao["usuario_esocial"])
+        #self.__edit_senha_certificado.setText(configuracao["senha_esocial"])
+        #self.__combo_tipo_certificado.setCurrentText(configuracao["tipo_certificado_esocial"])
+        #self.__edit_caminho_certificado.setText(configuracao["certificado_esocial"])
         self.__edit_banco_dominio.setText(configuracao["base_dominio"])
         self.__edit_usuario_dominio.setText(configuracao["usuario_dominio"])
         self.__edit_senha_dominio.setText(configuracao["senha_dominio"])
@@ -505,10 +524,10 @@ class eSocialConfiguracoes(QMainWindow):
             "usuario_dominio": self.__edit_usuario_dominio.text(),
             "senha_dominio": self.__edit_senha_dominio.text(),
             "empresa_padrao_rubricas": self.__edit_empresa_rubricas_dominio.text(),
-            "usuario_esocial": self.__edit_usuario_certificado.text(),
-            "senha_esocial": self.__edit_senha_certificado.text(),
-            "certificado_esocial": self.__edit_caminho_certificado.text(),
-            "tipo_certificado_esocial": self.__combo_tipo_certificado.currentText(),
+            #"usuario_esocial": self.__edit_usuario_certificado.text(),
+            #"senha_esocial": self.__edit_senha_certificado.text(),
+            #"certificado_esocial": self.__edit_caminho_certificado.text(),
+            #"tipo_certificado_esocial": self.__combo_tipo_certificado.currentText(),
             "usuario_sgd": self.__edit_usuario_sgd.text(),
             "senha_sgd": self.__edit_senha_sgd.text()
         }
