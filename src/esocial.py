@@ -866,10 +866,10 @@ class eSocialXML():
 
     def gerar_arquivos_saida(self, inscricao, codi_emp, relacao_empregados):
         """
-        Gravar os arquivos de eventos, lanÃ§amentos e mÃ©dias para importaÃ§Ã£o.
+        Gravar os arquivos de eventos, lançamentos e médias para importação.
 
-        Retorna as rubricas que sÃ£o de fÃ©rias e que devem ser lanÃ§adas no cÃ¡lculo
-        de fÃ©rias tambÃ©m.
+        Retorna as rubricas que são de férias e que devem ser lançadas no cálculo
+        de férias também.
         """
         sybase = Sybase(self.base_dominio, self.usuario_dominio, self.senha_dominio)
         connection = sybase.connect()
@@ -891,7 +891,7 @@ class eSocialXML():
         data_lancamentos_eventos = []
         data_lancto_medias = []
 
-        # Completa o de/para de rÃºbricas de cada empresa, com os relacionamentos feitos na planilha
+        # Completa o de/para de rubricas de cada empresa, com os relacionamentos feitos na planilha
         load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_rubrics_relationship, uses_company_rubrics)
 
         # coletar datas de pagamento
@@ -923,8 +923,8 @@ class eSocialXML():
             if line.get('fatorRubr') is not None:
                 valor_informado = line.get('fatorRubr')
 
-            # Se estiver dentro da competÃªncia a ser calculada gera como lanÃ§amento
-            # senÃ£o lanÃ§a como mÃ©dia
+            # Se estiver dentro da competência a ser calculada gera como lançamento
+            # senão lança como média
             converted_init_competence = convert_date(self.INIT_COMPETENCE, '%d/%m/%Y')
             converted_end_competence = convert_date(self.END_COMPETENCE, '%d/%m/%Y')
             converted_competence = convert_date(complete_competence, '%Y-%m-%d')
@@ -933,12 +933,12 @@ class eSocialXML():
                 # Separa o primeiro prefixo do campo, pois ele indica o tipo da folha
                 dm_dev = str(line.get('ideDmDev')).replace('RESC', '').split('_')[0]
 
-                # 11 Ã© evento de folha mensal
-                # 41 Ã© evento de adiantamento
-                # 51 Ã© evento de adiantamento 13Âº
-                # 52 Ã© evento de 13Âº integral
-                # 70 Ã© evento de PLR
-                # 42 Ã© evento de folha complementar
+                # 11 é evento de folha mensal
+                # 41 é evento de adiantamento
+                # 51 é evento de adiantamento 13Âº
+                # 52 é evento de 13Âº integral
+                # 70 é evento de PLR
+                # 42 é evento de folha complementar
                 match dm_dev:
                     case 'FAD13':
                         tipo_processo = '51'
@@ -949,15 +949,15 @@ class eSocialXML():
                     case 'FER':
                         tipo_processo = '11'
 
-                        # Para eventos de fÃ©rias, precisamos guardar eles para serem
-                        # lanÃ§ados tambÃ©m ao calcular as fÃ©rias do empregado
+                        # Para eventos de férias, precisamos guardar eles para serem
+                        # lançados também ao calcular as férias do empregado
                         new_format_competence = transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y')
                         data_vacation.add(valor_informado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_INFORMADO'])
                         data_vacation.add(valor_calculado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_CALCULADO'])
                     case _:
                         tipo_processo = '11'
 
-                # se nÃ£o encontrar a data de pagamento, vÃª o dia de pagamento da competÃªncia
+                # se não encontrar a data de pagamento, vê o dia de pagamento da competência
                 # anterior ou posterior
                 data_pagto = payment_data.get([cnpj_empregador, cpf_empregado, competence])
                 if is_null(data_pagto):
@@ -1003,7 +1003,7 @@ class eSocialXML():
                     data_lancamentos_eventos.append(new_table)
                     check_lancto.overwrite(new_table, [codi_emp, i_empregados, complete_competence, tipo_processo, i_eventos])
             else:
-                # eventos que entrarÃ£o para mÃ©dias
+                # eventos que entrarão para médias
                 if str(i_eventos) in rubrics_averages:
                     table = Table('FOLANCTOMEDIAS')
                     table.set_value('CODI_EMP', codi_emp)
@@ -1024,14 +1024,14 @@ class eSocialXML():
 
     def save_rescission(self, inscricao, codi_emp, relacao_empregados):
         """
-        Salvar dados de rescisÃ£o que o RPA irÃ¡ calcular
+        Salvar dados de rescisão que o RPA irá calcular
         """
-        # apagar dados jÃ¡ salvos
+        # apagar dados já salvos
         table = DominioRescisao()
         table.connect(self.BANCO_SQLITE)
         table.delete().execute()
 
-        # Carregar dados de aviso prÃ©vio
+        # Carregar dados de aviso prévio
         data_rescission = StorageData()
         for s2299 in self.dicionario_s2299:
             cnpj_empregador = self.dicionario_s2299[s2299].get("ideEmpregador").get("nrInsc")
@@ -1077,7 +1077,7 @@ class eSocialXML():
                 if tipo == 'empregado':
                     motivo_desligamento = data_rescission.get([codi_emp, i_empregados, 'MOTIVO_DESLIGAMENTO'])
                 else:
-                    # contribuintes vÃ£o por padrÃ£o no DomÃ­nio com motivo 99 - Outros
+                    # contribuintes vão por padrão no Domí­nio com motivo 99 - Outros
                     motivo_desligamento = '99'
 
                 new_line.codi_emp = codi_emp
@@ -1105,7 +1105,7 @@ class eSocialXML():
 
     def save_vacation(self, data_vacation):
         """
-        Salvar dados de fÃ©rias que o RPA irÃ¡ calcular
+        Salvar dados de férias que o RPA irá calcular
         """
         # apagar dados já salvos
         table = DominioFerias()
@@ -1118,7 +1118,7 @@ class eSocialXML():
             i_empregados = str(line.get_value('I_EMPREGADOS'))
             competencia = replace_day_date(line.get_value('GOZO_INICIO'), '%d/%m/%Y', 1)
 
-            # Se nÃ£o encontra nenhum lançamento na competência atual, diminui dois
+            # Se não encontra nenhum lançamento na competência atual, diminui dois
             # dias(prazo que as férias devem ser pagas) e tenta pesquisar novamente,
             # pois o pagamento pode ter sido feito na competência anterior
             data_rubric = data_vacation.get([codi_emp, i_empregados, competencia])
@@ -1463,7 +1463,7 @@ class eSocialXML():
             competence = self.dicionario_s1210[s1210].get('ideEvento').get('perApur')
             infos_pagto = self.dicionario_s1210[s1210].get('ideBenef').get('infoPgto')
 
-            # as vezes as informaÃ§Ãµes de pagamento vem em um unico objeto, e
+            # as vezes as informações de pagamento vem em um unico objeto, e
             # outras vem em uma lista de objetos
             if isinstance(infos_pagto, dict):
                 data_pagto = infos_pagto.get('dtPgto')
@@ -1471,7 +1471,7 @@ class eSocialXML():
                 data_pagto = ''
 
                 # percorre a lista de infos sobre o pagamento e coleta a data
-                # de pagamento daquela que for referente a mesma competÃªncia
+                # de pagamento daquela que for referente a mesma competência
                 for item in infos_pagto:
                     if item.get('detPgtoFl') is not None:
                         ref_competence = item.get('detPgtoFl').get('perRef')
@@ -1481,8 +1481,8 @@ class eSocialXML():
                     if competence == ref_competence:
                         data_pagto = item.get('dtPgto')
 
-                # as vezes em vez da competÃªncia vem somente o ano do pagamento
-                # dessa forma coletamos tambÃ©m quando o ano for igual ao da competÃªncia
+                # as vezes em vez da competência vem somente o ano do pagamento
+                # dessa forma coletamos também quando o ano for igual ao da competência
                 if is_null(data_pagto):
                     for item in infos_pagto:
                         if item.get('detPgtoFl') is not None:
@@ -1632,10 +1632,10 @@ class eSocialXML():
 
     def complete_data_rubrics(self, rubrics_esocial, companies_rubrics, rubrics_relationship, rubrics_averages):
         """
-        Complementa a tabela de rÃºbricas com alguma equivalente do contÃ¡bil, e gera tambÃ©m as bases de cÃ¡lculo
-        e fÃ³rmulas necessÃ¡rias
+        Complementa a tabela de rubricas com alguma equivalente do contábil, e gera também as bases de cálculo
+        e fórmulas necessárias
         """
-        # campos que virÃ£o dos dados do eSocial
+        # campos que virão dos dados do eSocial
         not_overwrite_keys = [
             'NOME',
             'PROV_DESC',
@@ -1673,13 +1673,13 @@ class eSocialXML():
                         natureza_folha_mensal_dominio, index_rubric = self.search_similar_rubric(line_rubric, data_rubrics)
                         if index_rubric:
 
-                            # copiar campos da rubrica do DomÃ­nio
+                            # copiar campos da rubrica do Domí­nio
                             for column in data_rubrics[natureza_folha_mensal_dominio][index_rubric]:
                                 column_value = data_rubrics[natureza_folha_mensal_dominio][index_rubric][column]
                                 if not is_null(column_value) and str(column_value) != 'None':
                                     table.set_value(column, column_value)
 
-                            # Copiar base de cÃ¡lculo e fÃ³rmula se tiver
+                            # Copiar base de cálculo e fórmula se tiver
                             if table.get_value('I_EVENTOS') in data_base_calc_rubrics.keys():
                                 rubric_calc_base = data_base_calc_rubrics[table.get_value('I_EVENTOS')]
 
@@ -1690,11 +1690,11 @@ class eSocialXML():
                     for field in not_overwrite_keys:
                         table.set_value(field, line_rubric.get(field))
 
-                    # Algumas empresas podem replicar rubricas de outras, aqui buscamos o cÃ³digo da empresa
+                    # Algumas empresas podem replicar rubricas de outras, aqui buscamos o código da empresa
                     # onde a rubrica deve ser importada
                     codi_emp_eve = uses_company_rubrics.get(codi_emp)
 
-                    # checa se rubrica jÃ¡ nÃ£o foi criada na empresa
+                    # checa se rubrica já não foi criada na empresa
                     if not check_importated_rubrics.exist([codi_emp_eve, i_eventos]):
                         check_importated_rubrics.add('True', [codi_emp_eve, i_eventos])
 
@@ -1705,10 +1705,10 @@ class eSocialXML():
                         table.set_value('I_EVENTOS', i_eventos_importation)
                         table.set_value('CODIGO_ESOCIAL', codigo_esocial)
 
-                        # salva o relacionamento da rÃºbrica
+                        # salva o relacionamento da rubrica
                         rubrics_relationship.add(i_eventos_importation, [str(codi_emp_eve), str(i_eventos)])
 
-                        # se tiver incidÃªncia no IRRF, marca a rubrica para compor a DIRF
+                        # se tiver incidência no IRRF, marca a rubrica para compor a DIRF
                         if format_int(table.get_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL')) in [11, 12, 13]:
                             table.set_value('SOMA_INF_REN', 'S')
                             table.set_value('REND_TRIBUTAVEIS', '1')
@@ -1716,14 +1716,14 @@ class eSocialXML():
                             table.set_value('SOMA_INF_REN', 'N')
                             table.set_value('REND_TRIBUTAVEIS', '0')
 
-                        # preenche alguns campos padrÃµes para a rÃºbrica
+                        # preenche alguns campos padrões para a rubrica
                         for key in campos_padra_rubrica.keys():
                             if is_null(table.get_value(key)):
                                 table.set_value(key, campos_padra_rubrica.get(key))
 
                         rubrics_importation.append(table.do_output())
 
-                        # checa se a rubrica deve entrar para mÃ©dias
+                        # checa se a rubrica deve entrar para médias
                         if str(table.get_value('SOMA_MEDIA_AVISO_PREVIO')) == '1':
                             if str(table.get_value('SOMA_MED_13')) == 'S':
                                 if str(table.get_value('SOMA_MED_FER')) == 'S':
@@ -1745,19 +1745,19 @@ class eSocialXML():
                             table_formula.set_value('FIL4', rubric_formula.get('FIL4'))
                             rubrics_formula.append(table_formula.do_output())
 
-                        # gera as bases de cÃ¡lculo para a rÃºbrica
+                        # gera as bases de cálculo para a rubrica
                         incidencia_inss = table.get_value('CODIGO_INCIDENCIA_INSS_ESOCIAL')
                         incidencia_irrf = table.get_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL')
                         incidencia_fgts = table.get_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL')
                         incidencia_sindical = table.get_value('CODIGO_INCIDENCIA_SINDICAL_ESOCIAL')
 
-                        # marca qual base de INSS precisa ser gerada conforme a incidÃªncia da rubrica
+                        # marca qual base de INSS precisa ser gerada conforme a incidência da rubrica
                         base_inss_mensal, base_inss_empresa_mensal, base_inss_terceiros_mensal, base_inss_rat_mensal = get_incidencia_inss(incidencia_inss)
 
-                        # marca qual base de IRRF precisa ser gerada conforme a incidÃªncia da rubrica
+                        # marca qual base de IRRF precisa ser gerada conforme a incidência da rubrica
                         base_irrf = get_incidencia_irrf(incidencia_irrf)
 
-                        # marca qual base de FGTS precisa ser gerada conforme a incidÃªncia da rubrica
+                        # marca qual base de FGTS precisa ser gerada conforme a incidência da rubrica
                         base_fgts = get_incidencia_fgts(incidencia_fgts)
 
                         if rubric_calc_base:
@@ -1765,7 +1765,7 @@ class eSocialXML():
                                 if not is_a_valid_base(incidencia_irrf, incidencia_inss, incidencia_fgts, incidencia_sindical, base_calc['I_CADBASES']):
                                     continue
 
-                                # se a rubrica jÃ¡ tiver a base, nÃ£o precisa ser gerada
+                                # se a rubrica já tiver a base, não precisa ser gerada
                                 if base_inss_mensal == format_int(base_calc['I_CADBASES']):
                                     base_inss_mensal = False
 
@@ -1799,7 +1799,7 @@ class eSocialXML():
 
                                 rubrics_base_calc_importation.append(table_calc.do_output())
 
-                        # gera a base de calculo se a rubrica tiver com determinada incidÃªncia marcada
+                        # gera a base de calculo se a rubrica tiver com determinada incidência marcada
                         if base_inss_mensal:
                             default_base = generate_default_base(table.get_value('CODI_EMP'), table.get_value('I_EVENTOS'), base_inss_mensal)
                             rubrics_base_calc_importation.append(default_base)
@@ -1828,7 +1828,7 @@ class eSocialXML():
 
     def search_similar_rubric(self, rubric, data_rubrics):
         """
-        Procura uma rÃºbrica da DomÃ­nio o mais similar possÃ­vel com a rÃºbrica da importaÃ§Ã£o
+        Procura uma rubrica da Domínio o mais similar possível com a rubrica da importação
         e retorna os campos NATUREZA_FOLHA_MENSAL e I_EVENTOS da rubrica encontrada
         """
         natureza_folha_mensal_dominio = ''
@@ -1842,7 +1842,7 @@ class eSocialXML():
             'CODIGO_INCIDENCIA_SINDICAL_ESOCIAL'
         ]
 
-        # Vai checando qual a rÃºbrica com mais tem campos iguais
+        # Vai checando qual a rubrica com mais tem campos iguais
         natureza_folha_mensal = rubric.get('NATUREZA_FOLHA_MENSAL')
         if str(natureza_folha_mensal) not in 'NULO' and natureza_folha_mensal in data_rubrics.keys():
             if len(data_rubrics[natureza_folha_mensal]) > 1:
@@ -1865,8 +1865,8 @@ class eSocialXML():
 
     def generate_i_evento(self, codi_emp_eventos, dominio_rubrics, dominio_rubrics_esocial, cnpj_companies):
         """
-        Gera um cÃ³digo de evento vÃ¡lido, dentro do range permitido(maior que 201).
-        E retorna o cÃ³digo da rubrica e o cÃ³digo eSocial
+        Gera um código de evento válido, dentro do range permitido(maior que 201).
+        E retorna o código da rubrica e o código eSocial
         """
         i_evento = 201
         codigo_esocial = 201
@@ -1891,7 +1891,7 @@ class eSocialXML():
 
 def get_incidencia_inss(incidencia):
     """
-    Retorna os cÃ³digos de bases respectivos de cada incidÃªncia de base de INSS
+    Retorna os códigos de bases respectivos de cada incidência de base de INSS
     """
     base_inss_mensal = False
     base_inss_empresa_mensal = False
@@ -1906,7 +1906,7 @@ def get_incidencia_inss(incidencia):
 
 def get_incidencia_irrf(incidencia):
     """
-    Retorna os cÃ³digos de bases respectivos de cada incidÃªncia de base de IRRF
+    Retorna os códigos de bases respectivos de cada incidência de base de IRRF
     """
     base_irrf = False
 
@@ -1918,7 +1918,7 @@ def get_incidencia_irrf(incidencia):
 
 def get_incidencia_fgts(incidencia):
     """
-    Retorna os cÃ³digos de bases respectivos de cada incidÃªncia de base de FGTS
+    Retorna os códigos de bases respectivos de cada incidência de base de FGTS
     """
     base_fgts = False
 
@@ -1930,8 +1930,8 @@ def get_incidencia_fgts(incidencia):
 
 def check_inss_irrf_fgts_base(tipo, incidencia, i_cad_base):
     """
-    Checa se a base de INSS, IRRF e FGTS estÃ£o de acordo com a incidÃªncia da rubrica.
-    Exemplo: rubrica estÃ¡ com incidÃªncia de IRRF mensal marcada e tem uma base de IRRF fÃ©rias.
+    Checa se a base de INSS, IRRF e FGTS estão de acordo com a incidência da rubrica.
+    Exemplo: rubrica está com incidência de IRRF mensal marcada e tem uma base de IRRF férias.
     """
     formated_i_cad_base = format_int(i_cad_base)
     if tipo == 'IRRF':
@@ -1962,7 +1962,7 @@ def check_inss_irrf_fgts_base(tipo, incidencia, i_cad_base):
 
 def get_all_incidencias(tipo):
     """
-    Retorna todos os cÃ³digos de bases que podem ser incidÃªncias de IRRF, FGTS ou INSS
+    Retorna todos os códigos de bases que podem ser incidências de IRRF, FGTS ou INSS
     """
     result = []
     values = []
@@ -1981,7 +1981,7 @@ def get_all_incidencias(tipo):
 
 def ignore_base_calc(base, base_calc):
     """"
-    FunÃ§Ã£o para validar se a base de calculo Ã© uma base referente a IRRF, INSS, FGTS ou Sindical
+    Função para validar se a base de calculo à uma base referente a IRRF, INSS, FGTS ou Sindical
     """
     if base in 'IRRF':
         if int(base_calc) in i_cadbases_irrf:
@@ -2003,9 +2003,9 @@ def ignore_base_calc(base, base_calc):
 
 def is_a_valid_base(incidencia_irrf, incidencia_inss, incidencia_fgts, incidencia_sindical, i_cadbases):
     """
-    Valida se o cÃ³digo da base estÃ¡ valida de acordo com a incidÃªncia da rÃºbrica
+    Valida se o código da base está valida de acordo com a incidência da rubrica
     """
-    # se tiver desmarcada a incidÃªncia de IRRF, retira as bases de calculo referente ao IRRF
+    # se tiver desmarcada a incidência de IRRF, retira as bases de calculo referente ao IRRF
     if not is_null(incidencia_irrf):
         if format_int(incidencia_irrf) in [0, 9]:
             if ignore_base_calc('IRRF', i_cadbases):
@@ -2014,7 +2014,7 @@ def is_a_valid_base(incidencia_irrf, incidencia_inss, incidencia_fgts, incidenci
             if not check_inss_irrf_fgts_base('IRRF', incidencia_irrf, i_cadbases):
                 return False
 
-    # se tiver desmarcada a incidÃªncia de INSS, retira as bases de calculo referente ao INSS
+    # se tiver desmarcada a incidência de INSS, retira as bases de calculo referente ao INSS
     if not is_null(incidencia_inss):
         if format_int(incidencia_inss) in [0]:
             if ignore_base_calc('INSS', i_cadbases):
@@ -2023,7 +2023,7 @@ def is_a_valid_base(incidencia_irrf, incidencia_inss, incidencia_fgts, incidenci
             if not check_inss_irrf_fgts_base('INSS', incidencia_inss, i_cadbases):
                 return False
 
-    # se tiver desmarcada a incidÃªncia de FGTS, retira as bases de calculo referente ao FGTS
+    # se tiver desmarcada a incidência de FGTS, retira as bases de calculo referente ao FGTS
     if not is_null(incidencia_fgts):
         if format_int(incidencia_fgts) in [0]:
             if ignore_base_calc('FGTS', i_cadbases):
@@ -2032,7 +2032,7 @@ def is_a_valid_base(incidencia_irrf, incidencia_inss, incidencia_fgts, incidenci
             if not check_inss_irrf_fgts_base('FGTS', incidencia_fgts, i_cadbases):
                 return False
 
-    # se tiver desmarcada a incidÃªncia SINDICAL, retira as bases de calculo referente ao sindicato
+    # se tiver desmarcada a incidência SINDICAL, retira as bases de calculo referente ao sindicato
     if not is_null(incidencia_sindical):
         if format_int(incidencia_sindical) in [0]:
             if ignore_base_calc('SINDICAL', i_cadbases):
@@ -2043,7 +2043,7 @@ def is_a_valid_base(incidencia_irrf, incidencia_inss, incidencia_fgts, incidenci
 
 def generate_default_base(codi_emp, i_eventos, i_cadbases):
     """
-    Gerar um registro padrÃ£o da tabela FOEVENTOSBASES com os dados passados por parÃ¢metro
+    Gerar um registro padrão da tabela FOEVENTOSBASES com os dados passados por parâmetro
     """
     table_calc = Table('FOEVENTOSBASES')
     table_calc.set_value('CODI_EMP', codi_emp)
@@ -2072,7 +2072,7 @@ def load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_ru
 
 def get_codi_emp(engine, inscricao):
     """
-    Recupera o cÃ³digo de uma empresa com base em sua inscriÃ§Ã£o
+    Recupera o código de uma empresa com base em sua inscrição
     """
     codi_emp = ''
     df = pd.read_sql(f'SELECT codi_emp FROM EMPRESAS WHERE inscricao = {inscricao}', con=engine)
