@@ -228,10 +228,13 @@ class eSocialXML():
         f.close()
 
     def processar_rubricas(self):
+        """
+        Aplica os eventos de alteração de rúbrica nas rúbricas originais
+        """
         dicionario_rubricas = self.dicionario_s1010.get("inclusao")
         dicionario_alteracoes = {}
 
-        if(self.dicionario_s1010.get("alteracao")):
+        if self.dicionario_s1010.get("alteracao"):
             for alteracao in self.dicionario_s1010["alteracao"]:
                 inscricao = self.dicionario_s1010["alteracao"][alteracao].get("ideEmpregador").get("nrInsc")
                 codigo_rubrica = self.dicionario_s1010["alteracao"][alteracao].get("infoRubrica").get("alteracao").get("ideRubrica").get("codRubr")
@@ -248,35 +251,43 @@ class eSocialXML():
                     "codIncSIND": dados_rubrica.get("codIncSIND")
                 }
         
-        if(dicionario_alteracoes):
+        if dicionario_alteracoes:
             for inclusao in dicionario_rubricas:
                 inscricao = dicionario_rubricas[inclusao].get("ideEmpregador").get("nrInsc")
                 codigo_rubrica = dicionario_rubricas[inclusao].get("infoRubrica").get("inclusao").get("ideRubrica").get("codRubr")
                 tabela_rubrica = dicionario_rubricas[inclusao].get("infoRubrica").get("inclusao").get("ideRubrica").get("ideTabRubr")
                 
-                if(dicionario_alteracoes.get(f"{inscricao}-{codigo_rubrica}-{tabela_rubrica}")):
+                if dicionario_alteracoes.get(f"{inscricao}-{codigo_rubrica}-{tabela_rubrica}"):
                     alteracoes = dicionario_alteracoes.get(f"{inscricao}-{codigo_rubrica}-{tabela_rubrica}")
 
-                    if(alteracoes.get("dscRubr")):
+                    if alteracoes.get("dscRubr"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["dscRubr"] = alteracoes.get("dscRubr")
 
-                    if(alteracoes.get("natRubr")):
+                    if alteracoes.get("natRubr"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["natRubr"] = alteracoes.get("natRubr")
 
-                    if(alteracoes.get("tpRubr")):
+                    if alteracoes.get("tpRubr"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["tpRubr"] = alteracoes.get("tpRubr")
                     
-                    if(alteracoes.get("codIncCP")):
+                    if alteracoes.get("codIncCP"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["codIncCP"] = alteracoes.get("codIncCP")
 
-                    if(alteracoes.get("codIncIRRF")):
+                    if alteracoes.get("codIncIRRF"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["codIncIRRF"] = alteracoes.get("codIncIRRF")
 
-                    if(alteracoes.get("codIncFGTS")):
+                    if alteracoes.get("codIncFGTS"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["codIncFGTS"] = alteracoes.get("codIncFGTS")
 
-                    if(alteracoes.get("codIncSIND")):
+                    if alteracoes.get("codIncSIND"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["codIncSIND"] = alteracoes.get("codIncSIND")
+
+            # rubricas que tem somente o evento de alteração
+            if self.dicionario_s1010.get("alteracao"):
+                for alteracao in self.dicionario_s1010["alteracao"]:
+                    dados_rubrica = self.dicionario_s1010["alteracao"].get(alteracao)
+                    if alteracao not in dicionario_rubricas.keys():
+                        dicionario_rubricas[alteracao] = dados_rubrica
+                        dicionario_rubricas[alteracao]['infoRubrica']['inclusao'] = dados_rubrica.get('infoRubrica').get('alteracao')
 
         return dicionario_rubricas
 
