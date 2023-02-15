@@ -70,9 +70,12 @@ motivos_desligamento_esocial = {
     "99": "99"
 }
 
-campos_padra_rubrica = {
+campos_fixos_rubrica = {
     "COMPOE_LIQUIDO": "1",
     "APARECE_RELATORIO": "S",
+}
+
+campos_padrao_rubrica = {
     "TIPO_INF": "V",
     "SOMA_SAL_BASE": "N",
     "APARECE_RECIBO": "S",

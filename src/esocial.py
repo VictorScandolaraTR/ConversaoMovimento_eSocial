@@ -1617,9 +1617,13 @@ class eSocialXML():
                             table.set_value('REND_TRIBUTAVEIS', '0')
 
                         # preenche alguns campos padrões para a rúbrica
-                        for key in campos_padra_rubrica.keys():
+                        for key in campos_padrao_rubrica.keys():
                             if is_null(table.get_value(key)):
-                                table.set_value(key, campos_padra_rubrica.get(key))
+                                table.set_value(key, campos_padrao_rubrica.get(key))
+
+                        # preenche alguns campos fixos para a rúbrica
+                        for key in campos_fixos_rubrica.keys():
+                            table.set_value(key, campos_fixos_rubrica.get(key))
 
                         rubrics_importation.append(table.do_output())
 
