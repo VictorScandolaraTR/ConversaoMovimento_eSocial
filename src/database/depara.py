@@ -71,6 +71,8 @@ motivos_desligamento_esocial = {
 }
 
 campos_padra_rubrica = {
+    "COMPOE_LIQUIDO": "1",
+    "APARECE_RELATORIO": "S",
     "TIPO_INF": "V",
     "SOMA_SAL_BASE": "N",
     "APARECE_RECIBO": "S",
