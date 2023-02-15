@@ -29,8 +29,11 @@ class eSocialXML():
         self.DIRETORIO_RPA = f"{self.DIRETORIO_TRABALHO}\\rpa"
         self.DIRETORIO_IMPORTAR = f"{self.DIRETORIO_TRABALHO}\\rpa\\Importar"
         self.BANCO_SQLITE = f"{self.DIRETORIO_TRABALHO}\\rpa\\query.db"
-        self.INIT_COMPETENCE = '01/01/2022'
-        self.END_COMPETENCE = '01/01/2023'
+        self.__main_database = f'.\\{diretorio_trabalho}\\operacao.db'
+
+        year = self.get_year_conversion()
+        self.INIT_COMPETENCE = f'01/01/{year}'
+        self.END_COMPETENCE = f'01/12/{year}'
 
         self.dicionario_rubricas_dominio = {} # Rubricas Domínio
         self.dicionario_s1010 = {} # Rubricas
@@ -464,7 +467,7 @@ class eSocialXML():
         print("Relacionando rubricas")
         for s1010 in tqdm(self.dicionario_s1010):
             inscricao = self.dicionario_s1010.get(s1010).get('ideEmpregador').get('nrInsc')
-            
+
             if(inscricao==empresa):
                 codigo = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('ideRubrica').get('codRubr')
 
@@ -1785,6 +1788,27 @@ class eSocialXML():
         dominio_rubrics_esocial[raiz_cnpj].append(str(codigo_esocial))
         return i_evento, codigo_esocial
 
+    def get_year_conversion(self):
+        """
+        retorna o ano que a conversão está sendo feita
+        """
+        empresas = Empresas()
+        empresas.connect(self.__main_database)
+
+        data = empresas.select().dicts().where(Empresas.inscricao == self.__inscricao)
+        year = ''
+        for line in data:
+            year = line['ano_conversao']
+
+        # se não tiver um ano informado, atribui o ano corrente
+        if not year:
+            year = str(get_current_day().year)
+            empresa = empresas.get(Empresas.inscricao == self.__inscricao)
+            empresa.ano_conversao = year
+            empresa.save()
+
+        return year
+
 
 def get_incidencia_inss(incidencia):
     """
@@ -1977,3 +2001,4 @@ def get_codi_emp(engine, inscricao):
         codi_emp = df.loc[index, "codi_emp"]
 
     return codi_emp
+
