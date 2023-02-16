@@ -318,25 +318,45 @@ class eSocial(QMainWindow):
             "Após a autenticação, o navegador será minimizado e será encerrado automaticamente após o fim do processo."
         self.alerta(mensagem_alerta)
 
-        lotes = esocial.baixar_dados_esocial()
-        lotes_erro = lotes["Erro"]
-        lotes_vazios = lotes ["Nenhum evento encontrado"]
-        lotes_baixados = lotes["Disponível para Baixar"]
-        total_lotes = lotes_erro + lotes_vazios + lotes_baixados
-        self.alerta(
-            f"Acesso ao portal encerrado.\n"\
-            f"Consultas realizadas: {total_lotes}\n"\
-            f"Consultas com resultado: {lotes_baixados}\n"\
-            f"Consultas sem resultado: {lotes_baixados}\n"\
-            f"Consultas com erro: {lotes_erro}\n"\
-        )
-        
-        self.atualiza_status("Lendo informações...")
-        esocial.extrair_arquivos_xml()
-        esocial.carregar_informacoes_xml()
+        lotes, periodos_consultados = esocial.baixar_dados_esocial()
 
-        self.atualiza_status("Dados carregados do e-Social","E")
-        self.seleciona_registro()
+        if(lotes["status"]):
+            conexao = self.__engine.connect()
+            conexao.execute(f"DELETE FROM PERIODOS WHERE inscricao = '{inscricao}'")
+
+            for solicitacao in periodos_consultados:
+                data_inicial = periodos_consultados[solicitacao]["data_inicial"]
+                data_final = periodos_consultados[solicitacao]["data_final"]
+                status = periodos_consultados[solicitacao]["status"]
+                indice = periodos_consultados[solicitacao]["indice"]
+
+                conexao.execute(f"INSERT INTO PERIODOS (inscricao, solicitacao, data_inicial, data_final, status, indice) "\
+                                f"VALUES ('{inscricao}','{solicitacao}','{data_inicial}','{data_final}','{status}',{indice})")
+
+            lotes_erro = lotes["Erro"]
+            lotes_vazios = lotes ["Nenhum evento encontrado"]
+            lotes_baixados = lotes["Disponível para Baixar"]
+            total_lotes = lotes_erro + lotes_vazios + lotes_baixados
+            self.alerta(
+                f"Acesso ao portal encerrado.\n"\
+                f"Consultas realizadas: {total_lotes}\n"\
+                f"Consultas com resultado: {lotes_baixados}\n"\
+                f"Consultas sem resultado: {lotes_vazios}\n"\
+                f"Consultas com erro: {lotes_erro}\n"\
+            )
+        
+            self.atualiza_status("Lendo informações...")
+            esocial.extrair_arquivos_xml()
+            esocial.carregar_informacoes_xml()
+
+            self.atualiza_status("Dados carregados do e-Social","E")
+            self.seleciona_registro()
+        else:
+            mensagem_alerta = f"Erro ao consultar informações do portal e-Social."
+            self.alerta(mensagem_alerta,"Deu errado")
+
+            self.atualiza_status("Dados carregados do e-Social")
+            self.seleciona_registro()
 
 
     def relaciona_empresa_dominio(self):
