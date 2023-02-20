@@ -21,7 +21,7 @@ class eSocial(QMainWindow):
         super().__init__()
         self.__window = Interface()
         self.__diretorio_trabalho = "xml"
-        self.__engine = create_engine(f"sqlite:///{self.__diretorio_trabalho}/operacao.db")
+        self.__engine = self.criar_banco_operacao()
         self.__empresas, self.__empresas_em_uso = self.carrega_empresas()
 
     def init_gui(self):
@@ -63,6 +63,42 @@ class eSocial(QMainWindow):
 
         self.atualiza_tabela_empresas()
         self.show()
+
+    def criar_banco_operacao(self):
+        if os.path.exists(f"{self.__diretorio_trabalho}/operacao.db"):
+            engine = create_engine(f"sqlite:///{self.__diretorio_trabalho}/operacao.db")
+        else:
+            engine = create_engine(f"sqlite:///{self.__diretorio_trabalho}/operacao.db")
+
+            sql_empresas = "CREATE TABLE EMPRESAS( "\
+                            "inscricao VARCHAR, "\
+                            "codi_emp INTEGER, "\
+                            "nome_emp VARCHAR, "\
+                            "status VARCHAR, "\
+                            "base_dominio VARCHAR, "\
+                            "usuario_dominio VARCHAR, "\
+                            "senha_dominio VARCHAR, "\
+                            "empresa_padrao_rubricas INTEGER, "\
+                            "usuario_esocial VARCHAR, "\
+                            "senha_esocial VARCHAR, "\
+                            "certificado_esocial VARCHAR, "\
+                            "tipo_certificado_esocial VARCHAR(2), "\
+                            "usuario_sgd VARCHAR, "\
+                            "senha_sgd VARCHAR)"
+
+            sql_periodos = "CREATE TABLE PERIODOS( "\
+                            "inscricao VARCHAR, "\
+                            "solicitacao VARCHAR, "\
+                            "data_inicial VARCHAR, "\
+                            "data_final VARCHAR, "\
+                            "status VARCHAR, "\
+                            "indice INTEGER)"
+            
+            conexao = engine.connect()
+            conexao.execute(sql_empresas)
+            conexao.execute(sql_periodos)
+
+        return engine
 
     def carrega_empresas(self):
         df = pd.read_sql("SELECT * FROM EMPRESAS", con=self.__engine)

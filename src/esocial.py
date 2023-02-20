@@ -92,6 +92,8 @@ class eSocialXML():
         f.close
 
     def solicita_arquivos_periodo(self, navegador: webdriver.Chrome, data_inicial: datetime, data_final: datetime):
+        print(f"Solicitando arquivos. Período {data_inicial.strftime('%d/%m/%Y')} - {data_final.strftime('%d/%m/%Y')}")
+
         navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Solicitacao')
         navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Todos os eventos entregues")
         
@@ -104,12 +106,13 @@ class eSocialXML():
         navegador.find_element(By.XPATH, '//*[@id="btnSalvar"]').click()
     
     def solicitar_dados_esocial(self, navegador: webdriver.Chrome, intervalo_dias: int, periodos = False):
+        print("Iniciando cadastro de solicitações")
         data_inicio_esocial = datetime.strptime('01/01/2018','%d/%m/%Y')
 
         if(periodos):
             # Aqui refaz a solicitação de períodos que deram erro dividindo em períodos menores
             for periodo in periodos:
-                if (periodos[periodo]["status"]=="Erro"):
+                if (periodos[periodo]["status"] in ["Erro","N"]):
                     periodos[periodo]["status"] = "Dividido"
 
                     data_inicial = periodos[periodo]["data_inicial"]
@@ -139,7 +142,7 @@ class eSocialXML():
             # Solicita todos os eventos da data atual até o início do e-Social (01/01/2018) em intervalos de tempo pré-definidos
             solicitacoes = 0
             while data_inicio_periodo > data_inicio_esocial:
-                self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+                #self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
 
                 data_fim_periodo = data_inicio_periodo - timedelta(days=1)
                 data_inicio_periodo = data_inicio_periodo - timedelta(days=intervalo_dias)
@@ -147,13 +150,20 @@ class eSocialXML():
                 solicitacoes = solicitacoes + 1
 
             data_inicio_periodo = data_inicio_esocial
-            self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+            #self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
 
             solicitacoes = solicitacoes + 1
 
         return solicitacoes, periodos
     
     def baixar_lotes_esocial(self, navegador: webdriver.Chrome, solicitacoes: int, lotes: dict):
+        print("---------------------------------------------")
+        print("Fazendo download de e lotes solicitados")
+        print(f"Nº de solicitações: {solicitacoes}")
+        print("Erro: "+str(lotes["Erro"]))
+        print("Nenhum evento encontrado: "+str(lotes["Nenhum evento encontrado"]))
+        print("Disponível para Baixar: "+str(lotes["Disponível para Baixar"]))
+        print("---------------------------------------------")
         navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
         navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
         
@@ -254,7 +264,7 @@ class eSocialXML():
             # Consulta resultado das solicitações
             lista_downloads, lotes, periodos = self.baixar_lotes_esocial(navegador, solicitacoes, lotes)
 
-            if(lotes["Erro"]>0):
+            if(lotes["Erro"]>0)|(lotes["Nenhum evento encontrado"]>0):
                 intervalo_dias = intervalo_dias / 2
                 solicitacoes = self.solicitar_dados_esocial(navegador,intervalo_dias,periodos)
                 lista_downloads_redistribuidos, lotes, periodos = self.baixar_lotes_esocial(navegador, solicitacoes, lotes)
@@ -269,7 +279,7 @@ class eSocialXML():
             navegador.close()
         except Exception as e:
             print(e)
-            #navegador.close()
+            navegador.close()
             lotes['status'] = False
             
         return lotes, periodos
