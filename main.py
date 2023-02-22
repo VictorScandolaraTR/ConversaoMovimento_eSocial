@@ -108,7 +108,7 @@ class eSocial(QMainWindow):
         for i in range(len(df)):
             empresas[str(i)] = {
                 "inscricao": df.loc[i, "inscricao"],
-                "codi_emp": df.loc[i, "codi_emp"],
+                "codi_emp": int(df.loc[i, "codi_emp"]),
                 "nome_emp": df.loc[i, "nome_emp"],
                 "status": df.loc[i, "status"],
                 "base_dominio": df.loc[i, "base_dominio"],
@@ -236,10 +236,10 @@ class eSocial(QMainWindow):
             "usuario_dominio": self.__empresas[indice]["usuario_dominio"],
             "senha_dominio": self.__empresas[indice]["senha_dominio"],
             "empresa_padrao_rubricas": self.__empresas[indice]["empresa_padrao_rubricas"],
-            "usuario_esocial": self.__empresas[indice]["usuario_esocial"],
-            "senha_esocial": self.__empresas[indice]["senha_esocial"],
-            "certificado_esocial": self.__empresas[indice]["certificado_esocial"],
-            "tipo_certificado_esocial": self.__empresas[indice]["tipo_certificado_esocial"],
+            #"usuario_esocial": self.__empresas[indice]["usuario_esocial"],
+            #"senha_esocial": self.__empresas[indice]["senha_esocial"],
+            #"certificado_esocial": self.__empresas[indice]["certificado_esocial"],
+            #"tipo_certificado_esocial": self.__empresas[indice]["tipo_certificado_esocial"],
             "usuario_sgd": self.__empresas[indice]["usuario_sgd"],
             "senha_sgd": self.__empresas[indice]["senha_sgd"]
         }
@@ -255,20 +255,16 @@ class eSocial(QMainWindow):
         usuario_dominio = dados["usuario_dominio"]
         senha_dominio = dados["senha_dominio"]
         empresa_padrao_rubricas = dados["empresa_padrao_rubricas"]
-        usuario_esocial = dados["usuario_esocial"]
-        senha_esocial = dados["senha_esocial"]
-        certificado_esocial = dados["certificado_esocial"]
-        tipo_certificado_esocial = dados["tipo_certificado_esocial"]
+        #usuario_esocial = dados["usuario_esocial"]
+        #senha_esocial = dados["senha_esocial"]
+        #certificado_esocial = dados["certificado_esocial"]
+        #tipo_certificado_esocial = dados["tipo_certificado_esocial"]
         usuario_sgd = dados["usuario_sgd"]
         senha_sgd = dados["senha_sgd"]
 
         sql = "UPDATE EMPRESAS SET base_dominio = '{base_dominio}', usuario_dominio = '{usuario_dominio}',"\
                 "senha_dominio = '{senha_dominio}',"\
                 "empresa_padrao_rubricas = '{empresa_padrao_rubricas}',"\
-                "usuario_esocial = '{usuario_esocial}',"\
-                "senha_esocial = '{senha_esocial}',"\
-                "certificado_esocial = '{certificado_esocial}',"\
-                "tipo_certificado_esocial = '{tipo_certificado_esocial}',"\
                 "usuario_sgd = '{usuario_sgd}',"\
                 "senha_sgd = '{senha_sgd}' "\
                 "WHERE inscricao = '{inscricao}'"
@@ -279,10 +275,6 @@ class eSocial(QMainWindow):
             usuario_dominio = usuario_dominio,
             senha_dominio = senha_dominio,
             empresa_padrao_rubricas = empresa_padrao_rubricas,
-            usuario_esocial = usuario_esocial,
-            senha_esocial = senha_esocial,
-            certificado_esocial = certificado_esocial,
-            tipo_certificado_esocial = tipo_certificado_esocial,
             usuario_sgd = usuario_sgd,
             senha_sgd = senha_sgd,
             inscricao = inscricao

@@ -142,7 +142,7 @@ class eSocialXML():
             # Solicita todos os eventos da data atual até o início do e-Social (01/01/2018) em intervalos de tempo pré-definidos
             solicitacoes = 0
             while data_inicio_periodo > data_inicio_esocial:
-                #self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+                self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
 
                 data_fim_periodo = data_inicio_periodo - timedelta(days=1)
                 data_inicio_periodo = data_inicio_periodo - timedelta(days=intervalo_dias)
@@ -150,7 +150,7 @@ class eSocialXML():
                 solicitacoes = solicitacoes + 1
 
             data_inicio_periodo = data_inicio_esocial
-            #self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+            self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
 
             solicitacoes = solicitacoes + 1
 
