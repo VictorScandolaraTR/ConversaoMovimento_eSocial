@@ -29,8 +29,11 @@ class eSocialXML():
         self.DIRETORIO_RPA = f"{self.DIRETORIO_TRABALHO}\\rpa"
         self.DIRETORIO_IMPORTAR = f"{self.DIRETORIO_TRABALHO}\\rpa\\Importar"
         self.BANCO_SQLITE = f"{self.DIRETORIO_TRABALHO}\\rpa\\query.db"
-        self.INIT_COMPETENCE = '01/01/2022'
-        self.END_COMPETENCE = '01/01/2023'
+        self.__main_database = f'.\\{diretorio_trabalho}\\operacao.db'
+
+        year = self.get_year_conversion()
+        self.INIT_COMPETENCE = f'01/01/{year}'
+        self.END_COMPETENCE = f'01/12/{year}'
 
         self.dicionario_rubricas_dominio = {} # Rubricas Domínio
         self.dicionario_s1010 = {} # Rubricas
@@ -228,10 +231,13 @@ class eSocialXML():
         f.close()
 
     def processar_rubricas(self):
+        """
+        Aplica os eventos de alteração de rúbrica nas rúbricas originais
+        """
         dicionario_rubricas = self.dicionario_s1010.get("inclusao")
         dicionario_alteracoes = {}
 
-        if(self.dicionario_s1010.get("alteracao")):
+        if self.dicionario_s1010.get("alteracao"):
             for alteracao in self.dicionario_s1010["alteracao"]:
                 inscricao = self.dicionario_s1010["alteracao"][alteracao].get("ideEmpregador").get("nrInsc")
                 codigo_rubrica = self.dicionario_s1010["alteracao"][alteracao].get("infoRubrica").get("alteracao").get("ideRubrica").get("codRubr")
@@ -248,35 +254,43 @@ class eSocialXML():
                     "codIncSIND": dados_rubrica.get("codIncSIND")
                 }
         
-        if(dicionario_alteracoes):
+        if dicionario_alteracoes:
             for inclusao in dicionario_rubricas:
                 inscricao = dicionario_rubricas[inclusao].get("ideEmpregador").get("nrInsc")
                 codigo_rubrica = dicionario_rubricas[inclusao].get("infoRubrica").get("inclusao").get("ideRubrica").get("codRubr")
                 tabela_rubrica = dicionario_rubricas[inclusao].get("infoRubrica").get("inclusao").get("ideRubrica").get("ideTabRubr")
                 
-                if(dicionario_alteracoes.get(f"{inscricao}-{codigo_rubrica}-{tabela_rubrica}")):
+                if dicionario_alteracoes.get(f"{inscricao}-{codigo_rubrica}-{tabela_rubrica}"):
                     alteracoes = dicionario_alteracoes.get(f"{inscricao}-{codigo_rubrica}-{tabela_rubrica}")
 
-                    if(alteracoes.get("dscRubr")):
+                    if alteracoes.get("dscRubr"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["dscRubr"] = alteracoes.get("dscRubr")
 
-                    if(alteracoes.get("natRubr")):
+                    if alteracoes.get("natRubr"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["natRubr"] = alteracoes.get("natRubr")
 
-                    if(alteracoes.get("tpRubr")):
+                    if alteracoes.get("tpRubr"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["tpRubr"] = alteracoes.get("tpRubr")
                     
-                    if(alteracoes.get("codIncCP")):
+                    if alteracoes.get("codIncCP"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["codIncCP"] = alteracoes.get("codIncCP")
 
-                    if(alteracoes.get("codIncIRRF")):
+                    if alteracoes.get("codIncIRRF"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["codIncIRRF"] = alteracoes.get("codIncIRRF")
 
-                    if(alteracoes.get("codIncFGTS")):
+                    if alteracoes.get("codIncFGTS"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["codIncFGTS"] = alteracoes.get("codIncFGTS")
 
-                    if(alteracoes.get("codIncSIND")):
+                    if alteracoes.get("codIncSIND"):
                         dicionario_rubricas[inclusao]["infoRubrica"]["inclusao"]["dadosRubrica"]["codIncSIND"] = alteracoes.get("codIncSIND")
+
+            # rubricas que tem somente o evento de alteração
+            if self.dicionario_s1010.get("alteracao"):
+                for alteracao in self.dicionario_s1010["alteracao"]:
+                    dados_rubrica = self.dicionario_s1010["alteracao"].get(alteracao)
+                    if alteracao not in dicionario_rubricas.keys():
+                        dicionario_rubricas[alteracao] = dados_rubrica
+                        dicionario_rubricas[alteracao]['infoRubrica']['inclusao'] = dados_rubrica.get('infoRubrica').get('alteracao')
 
         return dicionario_rubricas
 
@@ -453,7 +467,7 @@ class eSocialXML():
         print("Relacionando rubricas")
         for s1010 in tqdm(self.dicionario_s1010):
             inscricao = self.dicionario_s1010.get(s1010).get('ideEmpregador').get('nrInsc')
-            
+
             if(inscricao==empresa):
                 codigo = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('ideRubrica').get('codRubr')
 
@@ -1603,9 +1617,13 @@ class eSocialXML():
                             table.set_value('REND_TRIBUTAVEIS', '0')
 
                         # preenche alguns campos padrões para a rúbrica
-                        for key in campos_padra_rubrica.keys():
+                        for key in campos_padrao_rubrica.keys():
                             if is_null(table.get_value(key)):
-                                table.set_value(key, campos_padra_rubrica.get(key))
+                                table.set_value(key, campos_padrao_rubrica.get(key))
+
+                        # preenche alguns campos fixos para a rúbrica
+                        for key in campos_fixos_rubrica.keys():
+                            table.set_value(key, campos_fixos_rubrica.get(key))
 
                         rubrics_importation.append(table.do_output())
 
@@ -1773,6 +1791,27 @@ class eSocialXML():
         dominio_rubrics[codi_emp_eventos].append(i_evento)
         dominio_rubrics_esocial[raiz_cnpj].append(str(codigo_esocial))
         return i_evento, codigo_esocial
+
+    def get_year_conversion(self):
+        """
+        retorna o ano que a conversão está sendo feita
+        """
+        empresas = Empresas()
+        empresas.connect(self.__main_database)
+
+        data = empresas.select().dicts().where(Empresas.inscricao == self.__inscricao)
+        year = ''
+        for line in data:
+            year = line['ano_conversao']
+
+        # se não tiver um ano informado, atribui o ano corrente
+        if not year:
+            year = str(get_current_day().year)
+            empresa = empresas.get(Empresas.inscricao == self.__inscricao)
+            empresa.ano_conversao = year
+            empresa.save()
+
+        return year
 
 
 def get_incidencia_inss(incidencia):
@@ -1966,3 +2005,4 @@ def get_codi_emp(engine, inscricao):
         codi_emp = df.loc[index, "codi_emp"]
 
     return codi_emp
+
