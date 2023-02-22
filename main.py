@@ -71,6 +71,7 @@ class eSocial(QMainWindow):
             engine = create_engine(f"sqlite:///{self.__diretorio_trabalho}/operacao.db")
 
             sql_empresas = "CREATE TABLE EMPRESAS( "\
+                            "id INTEGER, "\
                             "inscricao VARCHAR, "\
                             "codi_emp INTEGER, "\
                             "nome_emp VARCHAR, "\
@@ -479,12 +480,17 @@ class eSocial(QMainWindow):
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
         indice = str(self.__tabela_empresas.selectedItems()[0].row())
 
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
+
         codi_emp = str(get_codi_emp(self.__engine, inscricao))
         base_dominio = self.__empresas[indice]["base_dominio"]
         usuario_dominio = self.__empresas[indice]["usuario_dominio"]
         senha_dominio = self.__empresas[indice]["senha_dominio"]
         usuario_sgd = self.__empresas[indice]["usuario_sgd"]
         senha_sgd = self.__empresas[indice]["senha_sgd"]
+        year = esocial.get_year_conversion()
+        init_competence = f'01/{year}'
+        end_competence = f'12/{year}'
 
         # Iniciar o RPA em uma Thread separada para não travar a interface
         self.thread2 = QThread()
@@ -498,7 +504,7 @@ class eSocial(QMainWindow):
             print('parte cadastral inválida')
             return False
 
-        self.rpa.prepare(codi_emp, '01/2022', '01/2023')
+        self.rpa.prepare(codi_emp, init_competence, end_competence)
         self.rpa.prepare_machines_for_calc(local, machines)
 
         self.thread2.started.connect(self.rpa.start)
