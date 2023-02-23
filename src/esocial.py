@@ -1,14 +1,12 @@
-import os, shutil, json, xmltodict, Levenshtein
+import os, shutil, json, xmltodict, Levenshtein, shutil, hashlib, pyautogui, time
 from tqdm import tqdm
 from sqlalchemy import create_engine
 import xml.dom.minidom as xml
 import pandas as pd
+from datetime import timedelta
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from src.classes.Table import Table
 from src.classes.StorageData import StorageData
 from src.classes.Sequencial import Sequencial
@@ -47,7 +45,7 @@ class eSocialXML():
         # Parâmetros de operação
         self.carrega_parametros()
 
-        # cria as pastas necessárias
+        # cria as pastas necessÃ¡rias
         create_folder(self.DIRETORIO_XML)
         create_folder(self.DIRETORIO_DOWNLOADS)
         create_folder(self.DIRETORIO_RPA)
@@ -90,33 +88,202 @@ class eSocialXML():
         f = open(f"{self.DIRETORIO_RAIZ}\\parametros.json","w")
         f.write(json.dumps(parametros))
         f.close
-    
-    def baixar_dados_esocial(self):
-        '''Acessa o portal e-Social com as credenciais necessárias e faz download dos arquivos do período'''
-        # # Abrir um navegador em 2º plano
-        chrome_options = Options()
-        chrome_options.headless = False
-        chrome_options.add_argument('ignore-certificate-errors')
-        #self.certificado_esocial
-        navegador = webdriver.Chrome(options=chrome_options)
 
-        # Abrir um navegador normal (visivel)
-        #navegador = webdriver.Chrome()
+    def solicita_arquivos_periodo(self, navegador: webdriver.Chrome, data_inicial: datetime, data_final: datetime):
+        print(f"Solicitando arquivos. Período {data_inicial.strftime('%d/%m/%Y')} - {data_final.strftime('%d/%m/%Y')}")
 
-        navegador.get("https://www.gov.br/esocial/pt-br")
-        navegador.find_element(By.XPATH, '/html/body').click()
-        navegador.find_element(By.XPATH, '//*[@id="d597868d-13e8-407b-b56a-feffb4a5d0b1"]/div/p[1]/a/img').click()
-        navegador.find_element(By.XPATH, '//*[@id="login-acoes"]/div[1]/p/button/img').click()
-        navegador.find_element(By.XPATH, '//*[@id="cert-digital"]/a').click()
-
-        # Aqui precisará de autenticação do certificado
-
-        navegador.find_element(By.XPATH, '//*[@id="menuDownload"]').click()
-        navegador.find_element(By.XPATH, '/html/body/div[3]/div[3]/div/div/ul/li[4]/ul/li[2]/a').click()
-        navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Table")
+        navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Solicitacao')
         navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Todos os eventos entregues")
+        
+        navegador.find_element(By.XPATH, '//*[@id="DataInicial"]').clear()
+        navegador.find_element(By.XPATH, '//*[@id="DataInicial"]').send_keys(data_inicial.strftime('%d/%m/%Y'))
+        navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').click()
+        navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').clear()
+        navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').send_keys(data_final.strftime('%d/%m/%Y'))
 
-        #ait.press(Keys.ENTER)
+        #navegador.find_element(By.XPATH, '//*[@id="btnSalvar"]').click()
+    
+    def solicitar_dados_esocial(self, navegador: webdriver.Chrome, intervalo_dias: int, periodos = False):
+        print("Iniciando cadastro de solicitações")
+        data_inicio_esocial = datetime.strptime('01/01/2018','%d/%m/%Y')
+
+        if(periodos):
+            # Aqui refaz a solicitação de períodos que deram erro dividindo em períodos menores
+            for periodo in periodos:
+                if (periodos[periodo]["status"] in ["Erro","N"]):
+                    periodos[periodo]["status"] = "Dividido"
+
+                    data_inicial = periodos[periodo]["data_inicial"]
+                    data_final = periodos[periodo]["data_final"]
+
+                    data_limite = datetime.strptime(data_inicial,'%d/%m/%Y')
+                    data_fim_periodo = datetime.strptime(data_final,'%d/%m/%Y')
+                    data_inicio_periodo = data_fim_periodo - timedelta(days=intervalo_dias)
+
+                    solicitacoes = 0
+                    while data_inicio_periodo > data_limite:
+                        self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+
+                        data_fim_periodo = data_inicio_periodo - timedelta(days=1)
+                        data_inicio_periodo = data_inicio_periodo - timedelta(days=intervalo_dias)
+                        
+                        solicitacoes = solicitacoes + 1
+
+                    data_inicio_periodo = data_limite
+                    self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+
+                    solicitacoes = solicitacoes + 1
+        else:
+            data_fim_periodo = datetime.now()
+            data_inicio_periodo = data_fim_periodo - timedelta(days=intervalo_dias)
+                
+            # Solicita todos os eventos da data atual até o início do e-Social (01/01/2018) em intervalos de tempo pré-definidos
+            solicitacoes = 0
+            while data_inicio_periodo > data_inicio_esocial:
+                self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+
+                data_fim_periodo = data_inicio_periodo - timedelta(days=1)
+                data_inicio_periodo = data_inicio_periodo - timedelta(days=intervalo_dias)
+                
+                solicitacoes = solicitacoes + 1
+
+            data_inicio_periodo = data_inicio_esocial
+            self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+
+            solicitacoes = solicitacoes + 1
+
+        return solicitacoes, periodos
+    
+    def baixar_lotes_esocial(self, navegador: webdriver.Chrome, solicitacoes: int, lotes: dict):
+        print("---------------------------------------------")
+        print("Fazendo download de e lotes solicitados")
+        print(f"Nº de solicitações: {solicitacoes}")
+        print("Erro: "+str(lotes["Erro"]))
+        print("Nenhum evento encontrado: "+str(lotes["Nenhum evento encontrado"]))
+        print("Disponível para Baixar: "+str(lotes["Disponível para Baixar"]))
+        print("---------------------------------------------")
+        navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
+        navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
+        print("1")
+        
+        lista = list(range(1, solicitacoes))
+        lista_downloads = []
+        lista_reprocessamento = []
+        periodos = {}
+        print("2")
+        
+        erros_registrados = {}
+        for i in lista:
+            print("3")
+            status = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[5]').text
+            numero_solicitacao = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[1]').text
+            periodo = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[4]').text
+            print("4")
+            data_inicial = periodo.split("\n")[0].replace(" ","").replace("DataInicial:","")
+            data_final = periodo.split("\n")[1].replace(" ","").replace("DataFinal:","")
+            print("5")
+            periodos[numero_solicitacao] = {
+                "data_inicial": data_inicial,
+                "data_final": data_final,
+                "status": status,
+                "indice": i
+            }
+            
+            if(status=="Disponível para Baixar"):
+                lista_downloads.append(numero_solicitacao)
+                navegador.get(f"https://www.esocial.gov.br/portal/Download/Pedido/Download?idPedido={numero_solicitacao}")
+
+                navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
+                navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
+
+                lotes["Disponível para Baixar"] = lotes["Disponível para Baixar"] + 1
+
+            if(status=="Solicitado"):
+                lista_reprocessamento.append(numero_solicitacao)
+                erros_registrados[numero_solicitacao] = 0
+
+        while(len(lista_reprocessamento)>0):
+            for item in lista_reprocessamento:
+
+                navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
+                navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
+
+                i = periodo[item]["indice"]
+                
+                status = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[5]').text
+                numero_solicitacao = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[1]').text
+
+                periodo[item]["status"] = status
+
+                if(status=="Disponível para Baixar"):
+                    lista_downloads.append(numero_solicitacao)
+                    navegador.get(f"https://www.esocial.gov.br/portal/Download/Pedido/Download?idPedido={numero_solicitacao}")
+
+                    navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
+                    navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
+
+                    lista_reprocessamento.remove(item)
+
+                if(status!="Solicitado"):
+                    if(status=="Erro"):
+                        if(erros_registrados[item]<5):
+                            erros_registrados[item] = erros_registrados[item] + 1
+                    else:
+                        print(status)
+                        lotes[status] = lotes[status] + 1
+                        lista_reprocessamento.remove(item)
+
+        return lista_downloads, lotes, periodos
+        
+    def baixar_dados_esocial(self,periodos = False):
+        '''Acessa o portal e-Social com as credenciais necessárias e faz download dos arquivos do período'''
+        os.system(f"del /q \"{self.DIRETORIO_DOWNLOADS}\"")
+        url = "https://www.gov.br/esocial/pt-br"
+        intervalo_dias = 100
+        downloads_folder = os.path.join(os.environ["USERPROFILE"], "Downloads")
+        lotes = {}
+        lotes["status"] = True
+        lotes["Erro"] = 0
+        lotes["Nenhum evento encontrado"] = 0
+        lotes["Disponível para Baixar"] = 0
+        
+        try:
+            chrome_options = Options()
+            chrome_options.headless = False
+            navegador = webdriver.Chrome(options=chrome_options,executable_path="bin\\chromedriver.exe")
+
+            navegador.get(url)
+            navegador.find_element(By.XPATH, '/html/body').click()
+            navegador.find_element(By.XPATH, '//*[@id="d597868d-13e8-407b-b56a-feffb4a5d0b1"]/div/p[1]/a/img').click()
+            navegador.find_element(By.XPATH, '//*[@id="login-acoes"]/div[1]/p/button/img').click()
+            navegador.find_element(By.XPATH, '//*[@id="cert-digital"]/a').click()
+            navegador.minimize_window()
+
+            # Aqui precisará de autenticação do certificado
+            solicitacoes, periodos = self.solicitar_dados_esocial(navegador,intervalo_dias,periodos)
+
+            # Consulta resultado das solicitações
+            lista_downloads, lotes, periodos = self.baixar_lotes_esocial(navegador, solicitacoes, lotes)
+
+            if(lotes["Erro"]>0)|(lotes["Nenhum evento encontrado"]>0):
+                intervalo_dias = intervalo_dias / 2
+                solicitacoes = self.solicitar_dados_esocial(navegador,intervalo_dias,periodos)
+                lista_downloads_redistribuidos, lotes, periodos = self.baixar_lotes_esocial(navegador, solicitacoes, lotes)
+
+                for download in lista_downloads_redistribuidos:
+                    lista_downloads.append(download)
+            
+            for item in lista_downloads:
+                print(item)
+                shutil.copy2(f"{downloads_folder}\\{item}.zip",f"{self.DIRETORIO_DOWNLOADS}\\{item}.zip")
+            
+            navegador.close()
+        except Exception as e:
+            print(e)
+            navegador.close()
+            lotes['status'] = False
+            
+        return lotes, periodos
 
     def configura_conexao_esocial(self,usuario,senha,certificado,tipo_certificado = "A1"):
         '''Configura conexão da classe com o portal e-Social'''
@@ -232,7 +399,7 @@ class eSocialXML():
 
     def processar_rubricas(self):
         """
-        Aplica os eventos de alteração de rúbrica nas rúbricas originais
+        Aplica os eventos de alteração de rubrica nas rubricas originais
         """
         dicionario_rubricas = self.dicionario_s1010.get("inclusao")
         dicionario_alteracoes = {}
@@ -420,6 +587,9 @@ class eSocialXML():
         cnpj = ''.join([str(item) for item in novo])
         return cnpj
 
+    def completar_inscricao(self):
+        self.__inscricao = self.completar_cnpj(self.__inscricao)
+
     def carregar_rubricas_dominio(self):
         '''Carrega rubricas'''
 
@@ -467,7 +637,7 @@ class eSocialXML():
         print("Relacionando rubricas")
         for s1010 in tqdm(self.dicionario_s1010):
             inscricao = self.dicionario_s1010.get(s1010).get('ideEmpregador').get('nrInsc')
-
+            
             if(inscricao==empresa):
                 codigo = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('ideRubrica').get('codRubr')
 
@@ -792,7 +962,7 @@ class eSocialXML():
         data_lancamentos_eventos = []
         data_lancto_medias = []
 
-        # Completa o de/para de rúbricas de cada empresa, com os relacionamentos feitos na planilha
+        # Completa o de/para de rubricas de cada empresa, com os relacionamentos feitos na planilha
         load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_rubrics_relationship, uses_company_rubrics)
 
         # coletar datas de pagamento
@@ -808,7 +978,7 @@ class eSocialXML():
 
             complete_competence = line.get('perApur')
             if len(complete_competence) == 4:
-                # preenche o mês 12 e dia como 01
+                # preenche o mÃªs 12 e dia como 01
                 complete_competence += '-12-01'
             else:
                 # preenche o dia como 01
@@ -836,8 +1006,8 @@ class eSocialXML():
 
                 # 11 é evento de folha mensal
                 # 41 é evento de adiantamento
-                # 51 é evento de adiantamento 13º
-                # 52 é evento de 13º integral
+                # 51 é evento de adiantamento 13Âº
+                # 52 é evento de 13Âº integral
                 # 70 é evento de PLR
                 # 42 é evento de folha complementar
                 match dm_dev:
@@ -978,7 +1148,7 @@ class eSocialXML():
                 if tipo == 'empregado':
                     motivo_desligamento = data_rescission.get([codi_emp, i_empregados, 'MOTIVO_DESLIGAMENTO'])
                 else:
-                    # contribuintes vão por padrão no Domínio com motivo 99 - Outros
+                    # contribuintes vão por padrão no Domí­nio com motivo 99 - Outros
                     motivo_desligamento = '99'
 
                 new_line.codi_emp = codi_emp
@@ -1175,6 +1345,7 @@ class eSocialXML():
         for s2299 in self.dicionario_s2299:
             cnpj_empregador = self.dicionario_s2299[s2299].get("ideEmpregador").get("nrInsc")
             cpf_empregado = self.dicionario_s2299[s2299].get("ideVinculo").get("cpfTrab")
+
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
             if is_null(codi_emp) or is_null(i_empregados):
@@ -1196,6 +1367,7 @@ class eSocialXML():
         for s2399 in self.dicionario_s2399:
             cnpj_empregador = self.dicionario_s2399[s2399].get("ideEmpregador").get("nrInsc")
             cpf_empregado = self.dicionario_s2399[s2399].get("ideTrabSemVinculo").get("cpfTrab")
+
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
             if is_null(codi_emp) or is_null(i_empregados):
@@ -1225,7 +1397,6 @@ class eSocialXML():
         sequencial_aquisitivos = Sequencial()
         sequencial_gozos = Sequencial()
         check_aquisitivos = StorageData()
-
         payment_data = self.load_date_payment()
 
         for s2230 in self.dicionario_s2230:
@@ -1404,7 +1575,7 @@ class eSocialXML():
 
     def generate_rubricas_esocial(self, generate_rubrics):
         """
-        Alimenta o cadastro da rúbrica com os campos que vem do eSocial
+        Alimenta o cadastro da rÃºbrica com os campos que vem do eSocial
         """
         rubrics_importation = []
         for rubric in generate_rubrics:
@@ -1434,7 +1605,7 @@ class eSocialXML():
 
     def read_companies_rubrics(self, inscricao, codi_emp, handle_lauch_rubrics):
         """
-        Retorna um dicionário de quais empresas utilizam determinada rúbrica
+        Retorna um dicionÃ¡rio de quais empresas utilizam determinada rÃºbrica
         """
         companies_rubrics = {}
 
@@ -1456,7 +1627,7 @@ class eSocialXML():
 
     def handle_lauch_rubrics(self):
         """
-        Faz um tratamento inicial nos dados dos eventos S-1200 para deixá-los todos no mesmo padrão
+        Faz um tratamento inicial nos dados dos eventos S-1200 para deixÃ¡-los todos no mesmo padrÃ£o
         """
         new_data = []
         for s1200 in self.dicionario_s1200:
@@ -1493,8 +1664,8 @@ class eSocialXML():
 
     def read_rescission_rubrics(self, handle_lauch_rubrics):
         """
-        Em alguns eventos S-2299 vem informadas algumas verbas rescisórias, então juntamos essas verbas
-        na lista de lançamentos que precisam ser feitos
+        Em alguns eventos S-2299 vem informadas algumas verbas rescisÃ³rias, entÃ£o juntamos essas verbas
+        na lista de lanÃ§amentos que precisam ser feitos
         """
         for s2299 in self.dicionario_s2299:
             infos_pagto = self.dicionario_s2299[s2299].get('infoDeslig').get('verbasResc')
@@ -1532,7 +1703,7 @@ class eSocialXML():
 
     def complete_data_rubrics(self, rubrics_esocial, companies_rubrics, rubrics_relationship, rubrics_averages):
         """
-        Complementa a tabela de rúbricas com alguma equivalente do contábil, e gera também as bases de cálculo
+        Complementa a tabela de rubricas com alguma equivalente do contábil, e gera também as bases de cálculo
         e fórmulas necessárias
         """
         # campos que virão dos dados do eSocial
@@ -1573,7 +1744,7 @@ class eSocialXML():
                         natureza_folha_mensal_dominio, index_rubric = self.search_similar_rubric(line_rubric, data_rubrics)
                         if index_rubric:
 
-                            # copiar campos da rubrica do Domínio
+                            # copiar campos da rubrica do Domí­nio
                             for column in data_rubrics[natureza_folha_mensal_dominio][index_rubric]:
                                 column_value = data_rubrics[natureza_folha_mensal_dominio][index_rubric][column]
                                 if not is_null(column_value) and str(column_value) != 'None':
@@ -1605,7 +1776,7 @@ class eSocialXML():
                         table.set_value('I_EVENTOS', i_eventos_importation)
                         table.set_value('CODIGO_ESOCIAL', codigo_esocial)
 
-                        # salva o relacionamento da rúbrica
+                        # salva o relacionamento da rubrica
                         rubrics_relationship.add(i_eventos_importation, [str(codi_emp_eve), str(i_eventos)])
 
                         # se tiver incidência no IRRF, marca a rubrica para compor a DIRF
@@ -1616,7 +1787,7 @@ class eSocialXML():
                             table.set_value('SOMA_INF_REN', 'N')
                             table.set_value('REND_TRIBUTAVEIS', '0')
 
-                        # preenche alguns campos padrões para a rúbrica
+                        # preenche alguns campos padrões para a rubrica
                         for key in campos_padrao_rubrica.keys():
                             if is_null(table.get_value(key)):
                                 table.set_value(key, campos_padrao_rubrica.get(key))
@@ -1649,7 +1820,7 @@ class eSocialXML():
                             table_formula.set_value('FIL4', rubric_formula.get('FIL4'))
                             rubrics_formula.append(table_formula.do_output())
 
-                        # gera as bases de cálculo para a rúbrica
+                        # gera as bases de cálculo para a rubrica
                         incidencia_inss = table.get_value('CODIGO_INCIDENCIA_INSS_ESOCIAL')
                         incidencia_irrf = table.get_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL')
                         incidencia_fgts = table.get_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL')
@@ -1732,7 +1903,7 @@ class eSocialXML():
 
     def search_similar_rubric(self, rubric, data_rubrics):
         """
-        Procura uma rúbrica da Domínio o mais similar possível com a rúbrica da importação
+        Procura uma rubrica da Domínio o mais similar possível com a rubrica da importação
         e retorna os campos NATUREZA_FOLHA_MENSAL e I_EVENTOS da rubrica encontrada
         """
         natureza_folha_mensal_dominio = ''
@@ -1746,7 +1917,7 @@ class eSocialXML():
             'CODIGO_INCIDENCIA_SINDICAL_ESOCIAL'
         ]
 
-        # Vai checando qual a rúbrica com mais tem campos iguais
+        # Vai checando qual a rubrica com mais tem campos iguais
         natureza_folha_mensal = rubric.get('NATUREZA_FOLHA_MENSAL')
         if str(natureza_folha_mensal) not in 'NULO' and natureza_folha_mensal in data_rubrics.keys():
             if len(data_rubrics[natureza_folha_mensal]) > 1:
@@ -1906,7 +2077,7 @@ def get_all_incidencias(tipo):
 
 def ignore_base_calc(base, base_calc):
     """"
-    Função para validar se a base de calculo é uma base referente a IRRF, INSS, FGTS ou Sindical
+    Função para validar se a base de calculo à uma base referente a IRRF, INSS, FGTS ou Sindical
     """
     if base in 'IRRF':
         if int(base_calc) in i_cadbases_irrf:
@@ -1928,7 +2099,7 @@ def ignore_base_calc(base, base_calc):
 
 def is_a_valid_base(incidencia_irrf, incidencia_inss, incidencia_fgts, incidencia_sindical, i_cadbases):
     """
-    Valida se o código da base está valida de acordo com a incidência da rúbrica
+    Valida se o código da base está valida de acordo com a incidência da rubrica
     """
     # se tiver desmarcada a incidência de IRRF, retira as bases de calculo referente ao IRRF
     if not is_null(incidencia_irrf):
@@ -2005,4 +2176,3 @@ def get_codi_emp(engine, inscricao):
         codi_emp = df.loc[index, "codi_emp"]
 
     return codi_emp
-
