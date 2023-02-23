@@ -932,6 +932,8 @@ class eSocialXML():
         table.connect(self.BANCO_SQLITE)
         table.delete().execute()
 
+        payment_data = self.load_date_payment_rescission(inscricao, codi_emp, relacao_empregados)
+
         # Carregar dados de aviso prévio
         data_rescission = StorageData()
         for s2299 in self.dicionario_s2299:
@@ -968,41 +970,47 @@ class eSocialXML():
             if format_int(line.get_value('I_AFASTAMENTOS')) == 8:
                 codi_emp = line.get_value('CODI_EMP')
                 i_empregados = line.get_value('I_EMPREGADOS')
+                data_demissao = add_day_to_date(line.get_value('DATA_REAL'), '%d/%m/%Y', -1)
+                competence = replace_day_date(data_demissao, '%d/%m/%Y', 1)
 
-                new_line = DominioRescisao()
-                new_line.connect(self.BANCO_SQLITE)
+                converted_init_competence = convert_date(self.INIT_COMPETENCE, '%d/%m/%Y')
+                converted_end_competence = convert_date(self.END_COMPETENCE, '%d/%m/%Y')
+                converted_competence = convert_date(competence, '%d/%m/%Y')
+                if converted_init_competence <= converted_competence <= converted_end_competence:
+                    new_line = DominioRescisao()
+                    new_line.connect(self.BANCO_SQLITE)
 
-                aviso_previo = data_rescission.get([codi_emp, i_empregados, 'AVISO_PREVIO'])
-                tipo = data_rescission.get([codi_emp, i_empregados, 'TIPO'])
+                    aviso_previo = data_rescission.get([codi_emp, i_empregados, 'AVISO_PREVIO'])
+                    tipo = data_rescission.get([codi_emp, i_empregados, 'TIPO'])
 
-                if tipo == 'empregado':
-                    motivo_desligamento = data_rescission.get([codi_emp, i_empregados, 'MOTIVO_DESLIGAMENTO'])
-                else:
-                    # contribuintes vão por padrão no Domínio com motivo 99 - Outros
-                    motivo_desligamento = '99'
+                    if tipo == 'empregado':
+                        motivo_desligamento = data_rescission.get([codi_emp, i_empregados, 'MOTIVO_DESLIGAMENTO'])
+                    else:
+                        # contribuintes vão por padrão no Domínio com motivo 99 - Outros
+                        motivo_desligamento = '99'
 
-                new_line.codi_emp = codi_emp
-                new_line.i_empregados = i_empregados
-                new_line.data_demissao = add_day_to_date(line.get_value('DATA_REAL'), '%d/%m/%Y', -1)
-                new_line.competencia = replace_day_date(new_line.data_demissao, '%d/%m/%Y', 1)
-                new_line.motivo = motivos_desligamento_esocial.get(motivo_desligamento)
-                new_line.data_pagamento = ''
+                    new_line.codi_emp = codi_emp
+                    new_line.i_empregados = i_empregados
+                    new_line.data_demissao = add_day_to_date(line.get_value('DATA_REAL'), '%d/%m/%Y', -1)
+                    new_line.competencia = replace_day_date(new_line.data_demissao, '%d/%m/%Y', 1)
+                    new_line.motivo = motivos_desligamento_esocial.get(motivo_desligamento)
+                    new_line.data_pagamento = payment_data.get([i_empregados, new_line.competencia])
 
-                if aviso_previo == 'S':
-                    data_fim_aviso = data_rescission.get([codi_emp, i_empregados, 'DATA_FIM_AVISO'])
-                    formated_data_fim_aviso = transform_date(data_fim_aviso, '%Y-%m-%d', '%d/%m/%Y')
-                    dias_projecao_aviso = difference_between_dates(line.get_value('DATA_REAL'), formated_data_fim_aviso, '%d/%m/%Y')
+                    if aviso_previo == 'S':
+                        data_fim_aviso = data_rescission.get([codi_emp, i_empregados, 'DATA_FIM_AVISO'])
+                        formated_data_fim_aviso = transform_date(data_fim_aviso, '%Y-%m-%d', '%d/%m/%Y')
+                        dias_projecao_aviso = difference_between_dates(line.get_value('DATA_REAL'), formated_data_fim_aviso, '%d/%m/%Y')
 
-                    new_line.aviso_previo = True
-                    new_line.data_aviso = line.get_value('DATA_REAL')
-                    new_line.dias_projecao_aviso = dias_projecao_aviso+1
-                else:
-                    new_line.aviso_previo = False
-                    new_line.data_aviso = ''
-                    new_line.dias_projecao_aviso = ''
+                        new_line.aviso_previo = True
+                        new_line.data_aviso = line.get_value('DATA_REAL')
+                        new_line.dias_projecao_aviso = dias_projecao_aviso+1
+                    else:
+                        new_line.aviso_previo = False
+                        new_line.data_aviso = ''
+                        new_line.dias_projecao_aviso = ''
 
-                if not is_null(new_line.motivo):
-                    new_line.save()
+                    if not is_null(new_line.motivo):
+                        new_line.save()
 
     def save_vacation(self, data_vacation):
         """
@@ -1353,7 +1361,8 @@ class eSocialXML():
 
     def load_date_payment(self):
         """
-        Carrega as datas de pagamento do evento 1210
+        Carrega as datas de pagamento do evento 1210 em um dicionário que
+        as chaves são a inscricao da empresa, cpf do empregado e competência
         """
         payment_data = StorageData()
         for s1210 in self.dicionario_s1210:
@@ -1399,6 +1408,51 @@ class eSocialXML():
                 data_pagto = ''
 
             payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
+
+        return payment_data
+
+    def load_date_payment_rescission(self, insc_empresa_converter, codi_emp, relacao_empregados):
+        """
+        Carrega as datas de pagamento de rescisão do evento 1210 em um dicionário que
+        as chaves são o código do empregado e competência
+        """
+        payment_data = StorageData()
+        for s1210 in self.dicionario_s1210:
+            insc_empresa = self.dicionario_s1210[s1210].get('ideEmpregador').get('nrInsc')
+            cpf_empregado = self.dicionario_s1210[s1210].get('ideBenef').get('cpfBenef')
+
+            infos_pagto = self.dicionario_s1210[s1210].get('ideBenef').get('infoPgto')
+
+            # as vezes as informações de pagamento vem em um unico objeto, e
+            # outras vem em uma lista de objetos
+            if isinstance(infos_pagto, dict):
+                data_pagto = infos_pagto.get('dtPgto')
+                competence = infos_pagto.get('perRef')
+                id_dm_dev = infos_pagto.get('ideDmDev')
+
+                if id_dm_dev is not None and insc_empresa_converter == insc_empresa:
+                    if 'RESC_' in id_dm_dev and not 'FAD13' in id_dm_dev:
+                        i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+                        formated_competence = transform_date(f'{competence}-01', '%Y-%m-%d', '%d/%m/%Y')
+                        formated_data_pagto = transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y')
+                        payment_data.add(data_pagto, [i_empregados, formated_competence])
+
+            elif isinstance(infos_pagto, list):
+                for item in infos_pagto:
+                    data_pagto = item.get('dtPgto')
+                    id_dm_dev = item.get('ideDmDev')
+
+                    if item.get('detPgtoFl') is not None:
+                        competence = item.get('detPgtoFl').get('perRef')
+                    else:
+                        competence = item.get('perRef')
+
+                    if id_dm_dev is not None and insc_empresa_converter == insc_empresa:
+                        if 'RESC_' in id_dm_dev and not 'FAD13' in id_dm_dev:
+                            i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+                            formated_competence = transform_date(f'{competence}-01', '%Y-%m-%d', '%d/%m/%Y')
+                            formated_data_pagto = transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y')
+                            payment_data.overwrite(data_pagto, [i_empregados, formated_competence])
 
         return payment_data
 
