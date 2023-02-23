@@ -1369,46 +1369,27 @@ class eSocialXML():
             insc_empresa = self.dicionario_s1210[s1210].get('ideEmpregador').get('nrInsc')
             cpf_empregado = self.dicionario_s1210[s1210].get('ideBenef').get('cpfBenef')
 
-            competence = self.dicionario_s1210[s1210].get('ideEvento').get('perApur')
             infos_pagto = self.dicionario_s1210[s1210].get('ideBenef').get('infoPgto')
 
             # as vezes as informações de pagamento vem em um unico objeto, e
             # outras vem em uma lista de objetos
             if isinstance(infos_pagto, dict):
                 data_pagto = infos_pagto.get('dtPgto')
-            elif isinstance(infos_pagto, list):
-                data_pagto = ''
+                competence = infos_pagto.get('perRef')
+                payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
 
+            elif isinstance(infos_pagto, list):
                 # percorre a lista de infos sobre o pagamento e coleta a data
                 # de pagamento daquela que for referente a mesma competência
                 for item in infos_pagto:
                     if item.get('detPgtoFl') is not None:
-                        ref_competence = item.get('detPgtoFl').get('perRef')
+                        competence = item.get('detPgtoFl').get('perRef')
                     else:
-                        ref_competence = item.get('perRef')
+                        competence = item.get('perRef')
 
-                    if competence == ref_competence:
-                        data_pagto = item.get('dtPgto')
-
-                # as vezes em vez da competência vem somente o ano do pagamento
-                # dessa forma coletamos também quando o ano for igual ao da competência
-                if is_null(data_pagto):
-                    for item in infos_pagto:
-                        if item.get('detPgtoFl') is not None:
-                            ref_competence = item.get('detPgtoFl').get('perRef')
-                        else:
-                            ref_competence = item.get('perRef')
-
-                        if not is_null(ref_competence) and len(ref_competence) == 4:
-                            if get_year(competence) == get_year(ref_competence):
-                                data_pagto = item.get('dtPgto')
-                        elif competence == ref_competence:
-                            data_pagto = item.get('dtPgto')
-            else:
-                data_pagto = ''
-
-            payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
-
+                    data_pagto = item.get('dtPgto')
+                    payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
+                
         return payment_data
 
     def load_date_payment_rescission(self, insc_empresa_converter, codi_emp, relacao_empregados):
