@@ -1496,7 +1496,37 @@ class eSocialXML():
         Em alguns eventos S-2299 vem informadas algumas verbas rescisórias, então juntamos essas verbas
         na lista de lançamentos que precisam ser feitos
         """
+        # Checa se existem eventos de retificação
+        check_retificacao = StorageData()
         for s2299 in self.dicionario_s2299:
+            infos_pagto = self.dicionario_s2299[s2299].get('infoDeslig').get('verbasResc')
+            inscricao_empresa = self.dicionario_s2299[s2299].get('ideEmpregador').get('nrInsc')
+            cpf_trabalhador = self.dicionario_s2299[s2299].get('ideVinculo').get('cpfTrab')
+            data_retificacao = format_date(str(s2299)[17:31], '%Y%m%d%H%M%S')
+
+            if infos_pagto is not None:
+
+                items_to_handle = []
+                if isinstance(infos_pagto.get('dmDev'), list):
+                    items_to_handle.extend(infos_pagto.get('dmDev'))
+                else:
+                    items_to_handle.append(infos_pagto.get('dmDev'))
+
+                for item in items_to_handle:
+                    ide_dm_dev = item.get('ideDmDev')
+
+                    if not check_retificacao.exist([inscricao_empresa, cpf_trabalhador, ide_dm_dev]):
+                        check_retificacao.add(str(s2299), [inscricao_empresa, cpf_trabalhador, ide_dm_dev, 'id'])
+                        check_retificacao.add(data_retificacao, [inscricao_empresa, cpf_trabalhador, ide_dm_dev, 'data_retificacao'])
+                    else:
+                        old_data_retificacao = check_retificacao.get([inscricao_empresa, cpf_trabalhador, ide_dm_dev, 'data_retificacao'])
+                        if data_retificacao > old_data_retificacao:
+                            check_retificacao.overwrite(str(s2299), [inscricao_empresa, cpf_trabalhador, ide_dm_dev, 'id'])
+                            check_retificacao.overwrite(data_retificacao, [inscricao_empresa, cpf_trabalhador, ide_dm_dev, 'data_retificacao'])
+
+        for s2299 in self.dicionario_s2299:
+            inscricao_empresa = self.dicionario_s2299[s2299].get('ideEmpregador').get('nrInsc')
+            cpf_trabalhador = self.dicionario_s2299[s2299].get('ideVinculo').get('cpfTrab')
             infos_pagto = self.dicionario_s2299[s2299].get('infoDeslig').get('verbasResc')
 
             if infos_pagto is not None:
@@ -1519,9 +1549,14 @@ class eSocialXML():
                         events_to_handle.append(infos_events)
 
                     for line in events_to_handle:
+                        # se for um evento que houve retificação, grava somente o evento retificado mais recente
+                        id_recibo = check_retificacao.get([inscricao_empresa, cpf_trabalhador, dm_dev, 'id'])
+                        if s2299 != id_recibo:
+                            continue
+
                         new_line = dict()
-                        new_line['nrInsc'] = self.dicionario_s2299[s2299].get('ideEmpregador').get('nrInsc')
-                        new_line['cpfTrab'] = self.dicionario_s2299[s2299].get('ideVinculo').get('cpfTrab')
+                        new_line['nrInsc'] = inscricao_empresa
+                        new_line['cpfTrab'] = cpf_trabalhador
                         new_line['perApur'] = get_competence(self.dicionario_s2299[s2299].get('infoDeslig').get('dtDeslig'))
                         new_line['ideDmDev'] = dm_dev
                         new_line['codRubr'] = line.get('codRubr')
