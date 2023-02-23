@@ -1431,7 +1431,7 @@ class eSocialXML():
                 id_dm_dev = infos_pagto.get('ideDmDev')
 
                 if id_dm_dev is not None and insc_empresa_converter == insc_empresa:
-                    if 'RESC_' in id_dm_dev and not 'FAD13' in id_dm_dev:
+                    if 'RESC_' in id_dm_dev and 'FAD13' not in id_dm_dev:
                         i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
                         formated_competence = transform_date(f'{competence}-01', '%Y-%m-%d', '%d/%m/%Y')
                         formated_data_pagto = transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y')
@@ -1448,7 +1448,7 @@ class eSocialXML():
                         competence = item.get('perRef')
 
                     if id_dm_dev is not None and insc_empresa_converter == insc_empresa:
-                        if 'RESC_' in id_dm_dev and not 'FAD13' in id_dm_dev:
+                        if 'RESC_' in id_dm_dev and 'FAD13' not in id_dm_dev:
                             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
                             formated_competence = transform_date(f'{competence}-01', '%Y-%m-%d', '%d/%m/%Y')
                             formated_data_pagto = transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y')
