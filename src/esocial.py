@@ -1435,7 +1435,7 @@ class eSocialXML():
                         i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
                         formated_competence = transform_date(f'{competence}-01', '%Y-%m-%d', '%d/%m/%Y')
                         formated_data_pagto = transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y')
-                        payment_data.add(data_pagto, [i_empregados, formated_competence])
+                        payment_data.add(formated_data_pagto, [i_empregados, formated_competence])
 
             elif isinstance(infos_pagto, list):
                 for item in infos_pagto:
@@ -1452,7 +1452,7 @@ class eSocialXML():
                             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
                             formated_competence = transform_date(f'{competence}-01', '%Y-%m-%d', '%d/%m/%Y')
                             formated_data_pagto = transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y')
-                            payment_data.overwrite(data_pagto, [i_empregados, formated_competence])
+                            payment_data.overwrite(formated_data_pagto, [i_empregados, formated_competence])
 
         return payment_data
 
