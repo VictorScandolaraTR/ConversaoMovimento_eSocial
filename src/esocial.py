@@ -983,8 +983,8 @@ class eSocialXML():
 
                 new_line.codi_emp = codi_emp
                 new_line.i_empregados = i_empregados
-                new_line.competencia = replace_day_date(line.get_value('DATA_REAL'), '%d/%m/%Y', 1)
-                new_line.data_demissao = line.get_value('DATA_REAL')
+                new_line.data_demissao = add_day_to_date(line.get_value('DATA_REAL'), '%d/%m/%Y', -1)
+                new_line.competencia = replace_day_date(new_line.data_demissao, '%d/%m/%Y', 1)
                 new_line.motivo = motivos_desligamento_esocial.get(motivo_desligamento)
                 new_line.data_pagamento = ''
 
