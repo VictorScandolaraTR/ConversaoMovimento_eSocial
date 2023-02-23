@@ -1244,6 +1244,9 @@ class eSocialXML():
                 continue
 
             infos_afastamento = self.dicionario_s2230[s2230].get("infoAfastamento")
+            if infos_afastamento.get('iniAfastamento') is None:
+                continue
+
             motivo = infos_afastamento.get('iniAfastamento').get("codMotAfast")
 
             # Afastamentos de férias é código 15 no eSocial
@@ -1382,8 +1385,11 @@ class eSocialXML():
                 # percorre a lista de infos sobre o pagamento e coleta a data
                 # de pagamento daquela que for referente a mesma competência
                 for item in infos_pagto:
-                    if item.get('detPgtoFl') is not None:
+                    if isinstance(item.get('detPgtoFl'), dict):
                         competence = item.get('detPgtoFl').get('perRef')
+                    elif isinstance(item.get('detPgtoFl'), list):
+                        for item_pagto in item.get('detPgtoFl'):
+                            competence = item_pagto.get('perRef')
                     else:
                         competence = item.get('perRef')
 
@@ -1423,8 +1429,11 @@ class eSocialXML():
                     data_pagto = item.get('dtPgto')
                     id_dm_dev = item.get('ideDmDev')
 
-                    if item.get('detPgtoFl') is not None:
+                    if isinstance(item.get('detPgtoFl'), dict):
                         competence = item.get('detPgtoFl').get('perRef')
+                    elif isinstance(item.get('detPgtoFl'), list):
+                        for item_pagto in item.get('detPgtoFl'):
+                            competence = item_pagto.get('perRef')
                     else:
                         competence = item.get('perRef')
 
