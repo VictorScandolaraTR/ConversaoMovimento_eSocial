@@ -78,14 +78,14 @@ class eSocialXML():
         '''Salva os parâmetros utilizados no arquivo parametros.json'''
 
         parametros = {
-            "base_dominio": self.base_dominio,
-            "usuario_dominio": self.usuario_dominio,
-            "senha_dominio": self.senha_dominio,
-            "empresa_padrao_rubricas": self.empresa_padrao_rubricas,
-            "usuario_esocial": self.usuario_esocial,
-            "senha_esocial": self.senha_esocial,
-            "certificado_esocial": self.certificado_esocial,
-            "tipo_certificado_esocial": self.tipo_certificado_esocial
+            "base_dominio": str(self.base_dominio),
+            "usuario_dominio": str(self.usuario_dominio),
+            "senha_dominio": str(self.senha_dominio),
+            "empresa_padrao_rubricas": str(self.empresa_padrao_rubricas),
+            "usuario_esocial": str(self.usuario_esocial),
+            "senha_esocial": str(self.senha_esocial),
+            "certificado_esocial": str(self.certificado_esocial),
+            "tipo_certificado_esocial": str(self.tipo_certificado_esocial)
         }
 
         f = open(f"{self.DIRETORIO_RAIZ}\\parametros.json","w")
