@@ -32,7 +32,8 @@ class eSocialXML():
         self.__main_database = f'.\\{diretorio_trabalho}\\operacao.db'
 
         year = self.get_year_conversion()
-        self.INIT_COMPETENCE = f'01/01/{year}'
+        previus_year = str(int(year)-1)
+        self.INIT_COMPETENCE = f'01/12/{previus_year}'
         self.END_COMPETENCE = f'01/12/{year}'
 
         self.dicionario_rubricas_dominio = {} # Rubricas Domínio
@@ -519,7 +520,7 @@ class eSocialXML():
 
                         if(relacao_dominio_esocial.get(lista_relacoes[0])==None): relacao_dominio_esocial[lista_relacoes[0]] = []
                         relacao_dominio_esocial[lista_relacoes[0]].append(s1010)
-                        
+
                     elif(len(lista_relacoes)>1):
                         print("Multi-relações")
                         linha = [
@@ -832,7 +833,7 @@ class eSocialXML():
             if converted_init_competence <= converted_competence <= converted_end_competence:
 
                 # Separa o primeiro prefixo do campo, pois ele indica o tipo da folha
-                dm_dev = str(line.get('ideDmDev')).replace('RESC', '').split('_')[0]
+                dm_dev = str(line.get('ideDmDev')).replace('RESC', '')
 
                 # 11 é evento de folha mensal
                 # 41 é evento de adiantamento
@@ -840,23 +841,22 @@ class eSocialXML():
                 # 52 é evento de 13º integral
                 # 70 é evento de PLR
                 # 42 é evento de folha complementar
-                match dm_dev:
-                    case 'FAD13':
-                        tipo_processo = '51'
-                    case 'F13':
-                        tipo_processo = '52'
-                    case 'FAD':
-                        tipo_processo = '41'
-                    case 'FER':
-                        tipo_processo = '11'
+                if dm_dev.startswith('FAD13'):
+                    tipo_processo = '51'
+                elif dm_dev.startswith('F13'):
+                    tipo_processo = '52'
+                elif dm_dev.startswith('FAD'):
+                    tipo_processo = '41'
+                elif dm_dev.startswith('FER'):
+                    tipo_processo = '11'
 
-                        # Para eventos de férias, precisamos guardar eles para serem
-                        # lançados também ao calcular as férias do empregado
-                        new_format_competence = transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y')
-                        data_vacation.add(valor_informado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_INFORMADO'])
-                        data_vacation.add(valor_calculado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_CALCULADO'])
-                    case _:
-                        tipo_processo = '11'
+                    # Para eventos de férias, precisamos guardar eles para serem
+                    # lançados também ao calcular as férias do empregado
+                    new_format_competence = transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y')
+                    data_vacation.add(valor_informado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_INFORMADO'])
+                    data_vacation.add(valor_calculado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_CALCULADO'])
+                else:
+                    tipo_processo = '11'
 
                 # se não encontrar a data de pagamento, vê o dia de pagamento da competência
                 # anterior ou posterior
@@ -1286,6 +1286,7 @@ class eSocialXML():
                 table.set_value('DIAS_GOZADOS', 0)
                 table.set_value('DIAS_ABONO', 0)
                 table.set_value('AVOS_ADQUIRIDOS', 12)
+                table.set_value('ATUALIZOU_DATA_FIM', 'NULO')
                 table.set_value('LIMITE_PARA_GOZO', limite_para_gozo)
 
                 data_foferias_aquisitivos.append(table.do_output())
