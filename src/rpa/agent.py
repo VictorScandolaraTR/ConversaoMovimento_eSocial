@@ -1197,7 +1197,7 @@ class Agent:
                             sleep(1)
 
                     sleep(3)
-                    autoit.control_click('', '[CLASSNN:PBEDIT1902]')
+                    autoit.control_focus('', '[CLASSNN:PBEDIT1902]')
 
                     if data[employee]['data_pagamento'] is not None:
                         self.print_log("info", f"Preenchendo data de pagamento {str(data[employee]['data_pagamento'])}")
