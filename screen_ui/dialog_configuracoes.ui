@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>551</width>
-    <height>193</height>
+    <height>233</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
      <x>10</x>
      <y>10</y>
      <width>531</width>
-     <height>141</height>
+     <height>181</height>
     </rect>
    </property>
    <property name="title">
@@ -29,7 +29,7 @@
     <property name="geometry">
      <rect>
       <x>200</x>
-      <y>50</y>
+      <y>80</y>
       <width>113</width>
       <height>20</height>
      </rect>
@@ -39,7 +39,7 @@
     <property name="geometry">
      <rect>
       <x>200</x>
-      <y>20</y>
+      <y>50</y>
       <width>113</width>
       <height>20</height>
      </rect>
@@ -49,7 +49,7 @@
     <property name="geometry">
      <rect>
       <x>200</x>
-      <y>80</y>
+      <y>110</y>
       <width>113</width>
       <height>20</height>
      </rect>
@@ -62,7 +62,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>50</y>
+      <y>80</y>
       <width>181</width>
       <height>16</height>
      </rect>
@@ -75,7 +75,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>80</y>
+      <y>110</y>
       <width>181</width>
       <height>16</height>
      </rect>
@@ -88,7 +88,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>20</y>
+      <y>50</y>
       <width>181</width>
       <height>16</height>
      </rect>
@@ -101,7 +101,7 @@
     <property name="geometry">
      <rect>
       <x>410</x>
-      <y>20</y>
+      <y>50</y>
       <width>113</width>
       <height>20</height>
      </rect>
@@ -111,7 +111,7 @@
     <property name="geometry">
      <rect>
       <x>330</x>
-      <y>50</y>
+      <y>80</y>
       <width>81</width>
       <height>16</height>
      </rect>
@@ -124,7 +124,7 @@
     <property name="geometry">
      <rect>
       <x>330</x>
-      <y>20</y>
+      <y>50</y>
       <width>81</width>
       <height>16</height>
      </rect>
@@ -137,7 +137,7 @@
     <property name="geometry">
      <rect>
       <x>410</x>
-      <y>50</y>
+      <y>80</y>
       <width>113</width>
       <height>20</height>
      </rect>
@@ -150,7 +150,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>110</y>
+      <y>140</y>
       <width>181</width>
       <height>16</height>
      </rect>
@@ -163,7 +163,7 @@
     <property name="geometry">
      <rect>
       <x>200</x>
-      <y>110</y>
+      <y>140</y>
       <width>113</width>
       <height>20</height>
      </rect>
@@ -172,12 +172,48 @@
      <enum>QLineEdit::Normal</enum>
     </property>
    </widget>
+   <widget class="QLineEdit" name="edit_diretorio_trabalho">
+    <property name="geometry">
+     <rect>
+      <x>200</x>
+      <y>20</y>
+      <width>271</width>
+      <height>20</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btn_diretorio_trabalho">
+    <property name="geometry">
+     <rect>
+      <x>470</x>
+      <y>20</y>
+      <width>51</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Buscar</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_11">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>20</y>
+      <width>181</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Diretório de trabalho</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QPushButton" name="btn_concertar_configuracoes">
    <property name="geometry">
     <rect>
      <x>300</x>
-     <y>160</y>
+     <y>200</y>
      <width>75</width>
      <height>23</height>
     </rect>
@@ -190,7 +226,7 @@
    <property name="geometry">
     <rect>
      <x>400</x>
-     <y>160</y>
+     <y>200</y>
      <width>75</width>
      <height>23</height>
     </rect>

@@ -20,8 +20,9 @@ class eSocial(QMainWindow):
     def __init__(self):
         super().__init__()
         self.__window = Interface()
-        self.__diretorio_trabalho = "xml"
         self.__engine = self.criar_banco_operacao()
+        self.__parametros = self.carrega_parametros()
+        self.__diretorio_trabalho = self.__parametros["diretorio_trabalho"]
         self.__empresas, self.__empresas_em_uso = self.carrega_empresas()
 
     def init_gui(self):
@@ -37,6 +38,7 @@ class eSocial(QMainWindow):
         self.__btn_adiciona_empresa = self.__window.btn_adiciona_empresa
         self.__btn_conexoes = self.__window.btn_conexoes
         self.__btn_obtem_dados_esocial = self.__window.btn_obtem_dados_esocial
+        self.__btn_obtem_dados_esocial_xml = self.__window.btn_obtem_dados_esocial_xml
         self.__btn_relaciona_empresas_dominio = self.__window.btn_relaciona_empresas_dominio
         self.__btn_relacionar_rubricas = self.__window.btn_relacionar_rubricas
         self.__btn_executa_rpa = self.__window.btn_executa_rpa
@@ -49,13 +51,14 @@ class eSocial(QMainWindow):
         self.__btn_adiciona_empresa.clicked.connect(self.adiciona_empresa)
         self.__btn_conexoes.clicked.connect(self.configura_conexoes)
         self.__btn_obtem_dados_esocial.clicked.connect(self.acessa_portal_esocial)
+        self.__btn_obtem_dados_esocial_xml.clicked.connect(self.extrai_dados_esocial)
         self.__btn_relaciona_empresas_dominio.clicked.connect(self.relaciona_empresa_dominio)
         self.__btn_relacionar_rubricas.clicked.connect(self.relacionar_rubricas)
         self.__btn_executa_rpa.clicked.connect(self.executar_rpa)
         self.__btn_excluir.clicked.connect(self.exclui_empresa)
 
-        self.__btn_conexoes.setEnabled(False)
         self.__btn_obtem_dados_esocial.setEnabled(False)
+        self.__btn_obtem_dados_esocial_xml.setEnabled(False)
         self.__btn_relaciona_empresas_dominio.setEnabled(False)
         self.__btn_relacionar_rubricas.setEnabled(False)
         self.__btn_executa_rpa.setEnabled(False)
@@ -64,11 +67,31 @@ class eSocial(QMainWindow):
         self.atualiza_tabela_empresas()
         self.show()
 
+        if self.__parametros["diretorio_trabalho"]=="":
+            self.configura_conexoes()
+
+    def carrega_parametros(self):
+        df = pd.read_sql("SELECT * FROM PARAMETROS", con=self.__engine)
+
+        parametros = {}
+        for i in range(len(df)):
+            parametros = {
+                "diretorio_trabalho": df.loc[i, "diretorio_trabalho"],
+                "base_dominio": df.loc[i, "base_dominio"],
+                "usuario_dominio": df.loc[i, "usuario_dominio"],
+                "senha_dominio": df.loc[i, "senha_dominio"],
+                "usuario_sgd": df.loc[i, "usuario_sgd"],
+                "senha_sgd": df.loc[i, "senha_sgd"],
+                "empresa_padrao_rubricas": df.loc[i, "empresa_padrao_rubricas"]
+            }
+
+        return parametros
+
     def criar_banco_operacao(self):
-        if os.path.exists(f"{self.__diretorio_trabalho}/operacao.db"):
-            engine = create_engine(f"sqlite:///{self.__diretorio_trabalho}/operacao.db")
+        if os.path.exists(f"src/database/operacao.db"):
+            engine = create_engine(f"sqlite:///src/database/operacao.db")
         else:
-            engine = create_engine(f"sqlite:///{self.__diretorio_trabalho}/operacao.db")
+            engine = create_engine(f"sqlite:///src/database/operacao.db")
 
             sql_empresas = "CREATE TABLE EMPRESAS( "\
                             "id INTEGER, "\
@@ -85,7 +108,8 @@ class eSocial(QMainWindow):
                             "certificado_esocial VARCHAR, "\
                             "tipo_certificado_esocial VARCHAR(2), "\
                             "usuario_sgd VARCHAR, "\
-                            "senha_sgd VARCHAR)"
+                            "senha_sgd VARCHAR, "\
+                            "ano_conversao VARCHAR)"
 
             sql_periodos = "CREATE TABLE PERIODOS( "\
                             "inscricao VARCHAR, "\
@@ -94,22 +118,42 @@ class eSocial(QMainWindow):
                             "data_final VARCHAR, "\
                             "status VARCHAR, "\
                             "indice INTEGER)"
+
+            sql_parametros = "CREATE TABLE PARAMETROS( "\
+                            "diretorio_trabalho VARCHAR, "\
+                            "base_dominio VARCHAR, "\
+                            "usuario_dominio VARCHAR, "\
+                            "senha_dominio VARCHAR, "\
+                            "usuario_sgd VARCHAR, "\
+                            "senha_sgd VARCHAR, "\
+                            "empresa_padrao_rubricas INTEGER)"
+            
+            sql_dados_parametros = "INSERT INTO PARAMETROS VALUES ('','','','','','',9999)"
             
             conexao = engine.connect()
             conexao.execute(sql_empresas)
             conexao.execute(sql_periodos)
+            conexao.execute(sql_parametros)
+            conexao.execute(sql_dados_parametros)
 
         return engine
 
     def carrega_empresas(self):
-        df = pd.read_sql("SELECT * FROM EMPRESAS", con=self.__engine)
+        df = pd.read_sql("SELECT * FROM EMPRESAS ORDER BY id", con=self.__engine)
 
         empresas = {}
 
         for i in range(len(df)):
+            codi_emp = df.loc[i, "codi_emp"]
+
+            try:
+                codi_emp = int(codi_emp)
+            except:
+                codi_emp = ""
+            
             empresas[str(i)] = {
                 "inscricao": df.loc[i, "inscricao"],
-                "codi_emp": int(df.loc[i, "codi_emp"]),
+                "codi_emp": codi_emp,
                 "nome_emp": df.loc[i, "nome_emp"],
                 "status": df.loc[i, "status"],
                 "base_dominio": df.loc[i, "base_dominio"],
@@ -170,6 +214,7 @@ class eSocial(QMainWindow):
     def adiciona_empresa(self):
         os.system(f"mkdir {self.__diretorio_trabalho}")
         proxima_linha = len(self.__empresas)
+        id = proxima_linha + 1
         inscricao = self.__edit_inscricao.text()
 
         if (inscricao == ""):
@@ -180,13 +225,13 @@ class eSocial(QMainWindow):
             self.__edit_inscricao.clear()
             return
 
-        os.system(f"mkdir {self.__diretorio_trabalho}\\{inscricao}")
-        os.system(f"mkdir {self.__diretorio_trabalho}\\{inscricao}\\downloads")
-        os.system(f"mkdir {self.__diretorio_trabalho}\\{inscricao}\\eventos")
-        os.system(f"mkdir {self.__diretorio_trabalho}\\{inscricao}\\importar")
+        os.system(f"mkdir \"{self.__diretorio_trabalho}/{inscricao}\"")
+        os.system(f"mkdir \"{self.__diretorio_trabalho}/{inscricao}/downloads\"")
+        os.system(f"mkdir \"{self.__diretorio_trabalho}/{inscricao}/eventos\"")
+        os.system(f"mkdir \"{self.__diretorio_trabalho}/{inscricao}/importar\"")
 
         conexao = self.__engine.connect()
-        conexao.execute(f"INSERT INTO EMPRESAS (inscricao) VALUES ('{inscricao}')")
+        conexao.execute(f"INSERT INTO EMPRESAS (id, inscricao) VALUES ({id},'{inscricao}')")
         self.atualiza_tabela_empresas()
 
         self.__empresas[str(proxima_linha)] = {
@@ -218,31 +263,27 @@ class eSocial(QMainWindow):
         conexao = self.__engine.connect()
         conexao.execute(f"DELETE FROM EMPRESAS WHERE inscricao = {inscricao}")
 
-        os.system(f"del /q {self.__diretorio_trabalho}\\{inscricao}\\downloads")
-        os.system(f"del /q {self.__diretorio_trabalho}\\{inscricao}\\eventos")
-        os.system(f"del /q {self.__diretorio_trabalho}\\{inscricao}\\importar")
-        os.system(f"del /q {self.__diretorio_trabalho}\\{inscricao}")
-        os.system(f"rmdir {self.__diretorio_trabalho}\\{inscricao}\\downloads")
-        os.system(f"rmdir {self.__diretorio_trabalho}\\{inscricao}\\eventos")
-        os.system(f"rmdir {self.__diretorio_trabalho}\\{inscricao}\\importar")
-        os.system(f"rmdir {self.__diretorio_trabalho}\\{inscricao}")
+        os.system(f"del /q \"{self.__diretorio_trabalho}/{inscricao}/downloads\"")
+        os.system(f"del /q \"{self.__diretorio_trabalho}/{inscricao}/eventos\"")
+        os.system(f"del /q \"{self.__diretorio_trabalho}/{inscricao}/importar\"")
+        os.system(f"del /q \"{self.__diretorio_trabalho}/{inscricao}\"")
+        os.system(f"rmdir \"{self.__diretorio_trabalho}/{inscricao}/downloads\"")
+        os.system(f"rmdir \"{self.__diretorio_trabalho}/{inscricao}/eventos\"")
+        os.system(f"rmdir \"{self.__diretorio_trabalho}/{inscricao}/importar\"")
+        os.system(f"rmdir \"{self.__diretorio_trabalho}/{inscricao}\"")
 
         self.__empresas, self.__empresas_em_uso = self.carrega_empresas()
         self.atualiza_tabela_empresas()
 
     def configura_conexoes(self):
-        indice = str(self.__tabela_empresas.selectedItems()[0].row())
         configuracoes = {
-            "base_dominio": self.__empresas[indice]["base_dominio"],
-            "usuario_dominio": self.__empresas[indice]["usuario_dominio"],
-            "senha_dominio": self.__empresas[indice]["senha_dominio"],
-            "empresa_padrao_rubricas": self.__empresas[indice]["empresa_padrao_rubricas"],
-            #"usuario_esocial": self.__empresas[indice]["usuario_esocial"],
-            #"senha_esocial": self.__empresas[indice]["senha_esocial"],
-            #"certificado_esocial": self.__empresas[indice]["certificado_esocial"],
-            #"tipo_certificado_esocial": self.__empresas[indice]["tipo_certificado_esocial"],
-            "usuario_sgd": self.__empresas[indice]["usuario_sgd"],
-            "senha_sgd": self.__empresas[indice]["senha_sgd"]
+            "diretorio_trabalho": self.__parametros["diretorio_trabalho"],
+            "base_dominio": self.__parametros["base_dominio"],
+            "usuario_dominio": self.__parametros["usuario_dominio"],
+            "senha_dominio": self.__parametros["senha_dominio"],
+            "empresa_padrao_rubricas": self.__parametros["empresa_padrao_rubricas"],
+            "usuario_sgd": self.__parametros["usuario_sgd"],
+            "senha_sgd": self.__parametros["senha_sgd"]
         }
 
         self.__dialog = eSocialConfiguracoes()
@@ -250,76 +291,79 @@ class eSocial(QMainWindow):
         self.__dialog.config_run.connect(self.atualiza_configuracoes)
 
     def atualiza_configuracoes(self, dados):
-        inscricao = self.__tabela_empresas.selectedItems()[0].text()
-
+        diretorio_trabalho = dados["diretorio_trabalho"]
         base_dominio = dados["base_dominio"]
         usuario_dominio = dados["usuario_dominio"]
         senha_dominio = dados["senha_dominio"]
         empresa_padrao_rubricas = dados["empresa_padrao_rubricas"]
-        #usuario_esocial = dados["usuario_esocial"]
-        #senha_esocial = dados["senha_esocial"]
-        #certificado_esocial = dados["certificado_esocial"]
-        #tipo_certificado_esocial = dados["tipo_certificado_esocial"]
         usuario_sgd = dados["usuario_sgd"]
         senha_sgd = dados["senha_sgd"]
 
-        sql = "UPDATE EMPRESAS SET base_dominio = '{base_dominio}', usuario_dominio = '{usuario_dominio}',"\
-                "senha_dominio = '{senha_dominio}',"\
-                "empresa_padrao_rubricas = '{empresa_padrao_rubricas}',"\
-                "usuario_sgd = '{usuario_sgd}',"\
-                "senha_sgd = '{senha_sgd}' "\
-                "WHERE inscricao = '{inscricao}'"
+        sql = "UPDATE PARAMETROS SET diretorio_trabalho = '{diretorio_trabalho}', "\
+                "base_dominio = '{base_dominio}', "\
+                "usuario_dominio = '{usuario_dominio}',"\
+                "senha_dominio = '{senha_dominio}', "\
+                "empresa_padrao_rubricas = '{empresa_padrao_rubricas}', "\
+                "usuario_sgd = '{usuario_sgd}', "\
+                "senha_sgd = '{senha_sgd}'"
 
         conexao = self.__engine.connect()
         conexao.execute(sql.format(
+            diretorio_trabalho = diretorio_trabalho,
             base_dominio = base_dominio,
             usuario_dominio = usuario_dominio,
             senha_dominio = senha_dominio,
             empresa_padrao_rubricas = empresa_padrao_rubricas,
             usuario_sgd = usuario_sgd,
-            senha_sgd = senha_sgd,
-            inscricao = inscricao
+            senha_sgd = senha_sgd
         ))
 
+        self.__parametros = self.carrega_parametros()
+        self.__diretorio_trabalho = self.__parametros["diretorio_trabalho"]
+
     def seleciona_registro(self):
+        if self.__diretorio_trabalho=="":
+            self.alerta("Configure os parâmetros de conexão antes de avançar.")
+            self.configura_conexoes()
+            return
         indice = self.__tabela_empresas.selectedItems()[0].row()
         status = self.__empresas[str(indice)]["status"]
 
         match status:
             case "" | None:
-                self.__btn_conexoes.setEnabled(True)
                 self.__btn_obtem_dados_esocial.setEnabled(True)
+                self.__btn_obtem_dados_esocial_xml.setEnabled(True)
                 self.__btn_relaciona_empresas_dominio.setEnabled(True)
                 self.__btn_relacionar_rubricas.setEnabled(False)
                 self.__btn_executa_rpa.setEnabled(False)
                 self.__btn_excluir.setEnabled(True)
             case "E":
-                self.__btn_conexoes.setEnabled(True)
                 self.__btn_obtem_dados_esocial.setEnabled(True)
+                self.__btn_obtem_dados_esocial_xml.setEnabled(True)
                 self.__btn_relaciona_empresas_dominio.setEnabled(True)
                 self.__btn_relacionar_rubricas.setEnabled(False)
                 self.__btn_executa_rpa.setEnabled(False)
                 self.__btn_excluir.setEnabled(True)
                 self.__tabela_empresas.selectedItems()[3].setText("Dados carregados do e-Social")
             case "D":
-                self.__btn_conexoes.setEnabled(True)
                 self.__btn_obtem_dados_esocial.setEnabled(True)
+                self.__btn_obtem_dados_esocial_xml.setEnabled(True)
                 self.__btn_relaciona_empresas_dominio.setEnabled(True)
                 self.__btn_relacionar_rubricas.setEnabled(True)
                 self.__btn_executa_rpa.setEnabled(False)
                 self.__btn_excluir.setEnabled(True)
                 self.__tabela_empresas.selectedItems()[3].setText("Dados carregados do Domínio")
             case "P":
-                self.__btn_conexoes.setEnabled(True)
                 self.__btn_obtem_dados_esocial.setEnabled(True)
+                self.__btn_obtem_dados_esocial_xml.setEnabled(True)
                 self.__btn_relaciona_empresas_dominio.setEnabled(True)
                 self.__btn_relacionar_rubricas.setEnabled(True)
                 self.__btn_executa_rpa.setEnabled(True)
                 self.__btn_excluir.setEnabled(True)
                 self.__tabela_empresas.selectedItems()[3].setText("Planilha de rubricas geradas")
             case "R":
-                self.__btn_conexoes.setEnabled(True)
                 self.__btn_obtem_dados_esocial.setEnabled(True)
+                self.__btn_obtem_dados_esocial_xml.setEnabled(True)
                 self.__btn_relaciona_empresas_dominio.setEnabled(True)
                 self.__btn_relacionar_rubricas.setEnabled(True)
                 self.__btn_executa_rpa.setEnabled(True)
@@ -336,10 +380,32 @@ class eSocial(QMainWindow):
             conexao = self.__engine.connect()
             conexao.execute(f"UPDATE EMPRESAS SET status = '{status_bd}' WHERE inscricao = '{inscricao}'")
 
+    def extrai_dados_esocial(self):
+        inscricao = self.__tabela_empresas.selectedItems()[0].text()
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao, self.__parametros)
+        esocial.completar_inscricao()
+        
+        mensagem_alerta = "Você selecionou a conversão dos dados através de arquivos XML fornecidos por você mesmo ao invés de realizar o download do Portal e-Social."\
+            " Certifique-se de atender os seguintes requisitos:\n\n"\
+            "1- Copie todos os arquivos XML para um diretório\n"\
+            "2- Certifique-se de que nesta pasta estejam apenas os arquivos XML\n\n"\
+            "Será aberta uma janela para solicitar que você informe a localização da pasta dos eventos."
+        self.alerta(mensagem_alerta)
+        caminho = components.ask_directory(self.__widget, "Selecione a pasta com os arquivos XML")
+
+        os.system(f"del /q \"{esocial.DIRETORIO_XML}\"")
+        os.system(f"copy  \"{caminho}\" \"{esocial.DIRETORIO_XML}\"")
+        
+        self.atualiza_status("Lendo informações...")
+        esocial.carregar_informacoes_xml()
+
+        self.atualiza_status("Dados carregados do e-Social","E")
+        self.seleciona_registro()
+
     def acessa_portal_esocial(self):
         indice = str(self.__tabela_empresas.selectedItems()[0].row())
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
-        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao, self.__parametros)
         esocial.completar_inscricao()
         self.atualiza_status("Buscando dados do e-Social...")
         mensagem_alerta = "IMPORTANTE!\n"\
@@ -366,7 +432,7 @@ class eSocial(QMainWindow):
             lotes_vazios = lotes ["Nenhum evento encontrado"]
             lotes_baixados = lotes["Disponível para Baixar"]
             total_lotes = lotes_erro + lotes_vazios + lotes_baixados
-            self.alerta(
+            print(
                 f"Acesso ao portal encerrado.\n"\
                 f"Consultas realizadas: {total_lotes}\n"\
                 f"Consultas com resultado: {lotes_baixados}\n"\
@@ -375,29 +441,25 @@ class eSocial(QMainWindow):
             )
         
             self.atualiza_status("Lendo informações...")
-            esocial.extrair_arquivos_xml()
+            #esocial.extrair_arquivos_xml()
             esocial.carregar_informacoes_xml()
 
             self.atualiza_status("Dados carregados do e-Social","E")
             self.seleciona_registro()
         else:
-            mensagem_alerta = f"Erro ao consultar informações do portal e-Social."
-            self.alerta(mensagem_alerta,"Deu errado")
+            mensagem_alerta = f"Estamos enfrentando dificuldade em acessar o portal e-Social.\nFavor tentar novamente mais tarde."
+            titulo = "Erro ao consultar informações do portal e-Social"
+            self.alerta(mensagem_alerta,titulo)
 
-            self.atualiza_status("Dados carregados do e-Social")
-            self.seleciona_registro()
+            self.atualiza_status("Erro ao baixar dados do e-Social")
 
 
     def relaciona_empresa_dominio(self):
         self.atualiza_status("Consultando banco de dados Domínio...")
         indice = str(self.__tabela_empresas.selectedItems()[0].row())
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
-        base_dominio = self.__empresas[indice]["base_dominio"]
-        usuario_dominio = self.__empresas[indice]["usuario_dominio"]
-        senha_dominio = self.__empresas[indice]["senha_dominio"]
         
-        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
-        esocial.configura_conexao_dominio(base_dominio, usuario_dominio, senha_dominio)
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao, self.__parametros)
 
         empresas = esocial.relaciona_empresas(str(self.__tabela_empresas.selectedItems()[0].text()))
         indice = self.__tabela_empresas.selectedItems()[0].row()
@@ -425,16 +487,11 @@ class eSocial(QMainWindow):
         self.seleciona_registro()
 
     def relacionar_rubricas(self):
-        indice = str(self.__tabela_empresas.selectedItems()[0].row())
-        base_dominio = self.__empresas[indice]["base_dominio"]
-        usuario_dominio = self.__empresas[indice]["usuario_dominio"]
-        senha_dominio = self.__empresas[indice]["senha_dominio"]
         self.atualiza_status("Gerando planilha de relações de rubricas...")
 
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
-        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao, self.__parametros)
         esocial.carregar_informacoes_xml()
-        esocial.configura_conexao_dominio(base_dominio, usuario_dominio, senha_dominio)
         esocial.gera_excel_relacao(self.__tabela_empresas.selectedItems()[0].text())
         self.atualiza_status("Planilha de rubricas geradas", "P")
         self.seleciona_registro()
@@ -442,7 +499,7 @@ class eSocial(QMainWindow):
     def executar_rpa(self):
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
 
-        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao, self.__parametros)
         codi_emp = str(get_codi_emp(self.__engine, inscricao))
 
         relacao_empregados = esocial.relaciona_empregados()
@@ -480,14 +537,14 @@ class eSocial(QMainWindow):
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
         indice = str(self.__tabela_empresas.selectedItems()[0].row())
 
-        esocial = eSocialXML(self.__diretorio_trabalho, inscricao)
+        esocial = eSocialXML(self.__diretorio_trabalho, inscricao, self.__parametros)
 
         codi_emp = str(get_codi_emp(self.__engine, inscricao))
-        base_dominio = self.__empresas[indice]["base_dominio"]
-        usuario_dominio = self.__empresas[indice]["usuario_dominio"]
-        senha_dominio = self.__empresas[indice]["senha_dominio"]
-        usuario_sgd = self.__empresas[indice]["usuario_sgd"]
-        senha_sgd = self.__empresas[indice]["senha_sgd"]
+        base_dominio = self.__parametros["base_dominio"]
+        usuario_dominio = self.__parametros["usuario_dominio"]
+        senha_dominio = self.__parametros["senha_dominio"]
+        usuario_sgd = self.__parametros["usuario_sgd"]
+        senha_sgd = self.__parametros["senha_sgd"]
         year = esocial.get_year_conversion()
         init_competence = f'01/{year}'
         end_competence = f'12/{year}'
@@ -533,17 +590,11 @@ class eSocialConfiguracoes(QMainWindow):
         self.__window.setupUi(self)
         self.setWindowTitle('Configuração de credenciais')
 
-        #cself.__widget = self.__window.centralwidget
-
+        self.__btn_diretorio_trabalho = self.__window.btn_diretorio_trabalho
         self.__btn_cancelar = self.__window.btn_concertar_configuracoes
         self.__btn_confirmar_configuracoes = self.__window.btn_confirmar_configuracoes
 
-        #self.__edit_usuario_certificado = self.__window.edit_usuario_certificado
-        #self.__edit_senha_certificado = self.__window.edit_senha_certificado
-        #self.__combo_tipo_certificado = self.__window.combo_tipo_certificado
-        #self.__edit_caminho_certificado = self.__window.edit_caminho_certificado
-        #self.__btn_busca_certificado = self.__window.btn_busca_certificado
-
+        self.__edit_diretorio_trabalho = self.__window.edit_diretorio_trabalho
         self.__edit_banco_dominio = self.__window.edit_banco_dominio
         self.__edit_usuario_dominio = self.__window.edit_usuario_dominio
         self.__edit_senha_dominio = self.__window.edit_senha_dominio
@@ -552,14 +603,11 @@ class eSocialConfiguracoes(QMainWindow):
         self.__edit_usuario_sgd = self.__window.edit_usuario_sgd
         self.__edit_senha_sgd = self.__window.edit_senha_sgd
 
-        #self.__btn_busca_certificado.clicked.connect(self.busca_certificado)
+        self.__btn_diretorio_trabalho.clicked.connect(self.busca_diretorio)
         self.__btn_cancelar.clicked.connect(self.close)
         self.__btn_confirmar_configuracoes.clicked.connect(self.salvar)
 
-        #self.__edit_usuario_certificado.setText(configuracao["usuario_esocial"])
-        #self.__edit_senha_certificado.setText(configuracao["senha_esocial"])
-        #self.__combo_tipo_certificado.setCurrentText(configuracao["tipo_certificado_esocial"])
-        #self.__edit_caminho_certificado.setText(configuracao["certificado_esocial"])
+        self.__edit_diretorio_trabalho.setText(configuracao["diretorio_trabalho"])
         self.__edit_banco_dominio.setText(configuracao["base_dominio"])
         self.__edit_usuario_dominio.setText(configuracao["usuario_dominio"])
         self.__edit_senha_dominio.setText(configuracao["senha_dominio"])
@@ -568,20 +616,28 @@ class eSocialConfiguracoes(QMainWindow):
         self.__edit_senha_sgd.setText(configuracao["senha_sgd"])
 
         self.show()
-    def busca_certificado(self):
-        path = components.ask_file(self.__widget, 'Selecione o certificado.')
-        self.__edit_caminho_certificado.setText(path)
+
+    def busca_diretorio(self):
+        path = components.ask_directory(self.window(), 'Selecione o diretório de trabalho.')
+        self.__edit_diretorio_trabalho.setText(path)
+
+    def alerta(self, mensagem, titulo = "Atenção"):
+        msg = QMessageBox()
+        msg.setWindowTitle(titulo)
+        msg.setText(mensagem)
+        msg.exec()
 
     def salvar(self):
+        if self.__edit_diretorio_trabalho.text()=="":
+            self.alerta("Preencha o diretório de trabalho.","Atenção")
+            self.busca_diretorio()
+
         dados = {
+            "diretorio_trabalho": self.__edit_diretorio_trabalho.text(),
             "base_dominio": self.__edit_banco_dominio.text(),
             "usuario_dominio": self.__edit_usuario_dominio.text(),
             "senha_dominio": self.__edit_senha_dominio.text(),
             "empresa_padrao_rubricas": self.__edit_empresa_rubricas_dominio.text(),
-            #"usuario_esocial": self.__edit_usuario_certificado.text(),
-            #"senha_esocial": self.__edit_senha_certificado.text(),
-            #"certificado_esocial": self.__edit_caminho_certificado.text(),
-            #"tipo_certificado_esocial": self.__combo_tipo_certificado.currentText(),
             "usuario_sgd": self.__edit_usuario_sgd.text(),
             "senha_sgd": self.__edit_senha_sgd.text()
         }

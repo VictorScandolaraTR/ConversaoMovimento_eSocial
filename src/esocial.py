@@ -71,24 +71,6 @@ class eSocialXML():
             self.usuario_sgd = df.loc[index, "usuario_sgd"]
             self.senha_sgd = df.loc[index, "senha_sgd"]
 
-    def salvar_parametros(self):
-        '''Salva os parâmetros utilizados no arquivo parametros.json'''
-
-        parametros = {
-            "base_dominio": self.base_dominio,
-            "usuario_dominio": self.usuario_dominio,
-            "senha_dominio": self.senha_dominio,
-            "empresa_padrao_rubricas": self.empresa_padrao_rubricas,
-            "usuario_esocial": self.usuario_esocial,
-            "senha_esocial": self.senha_esocial,
-            "certificado_esocial": self.certificado_esocial,
-            "tipo_certificado_esocial": self.tipo_certificado_esocial
-        }
-
-        f = open(f"{self.DIRETORIO_RAIZ}\\parametros.json","w")
-        f.write(json.dumps(parametros))
-        f.close
-
     def solicita_arquivos_periodo(self, navegador: webdriver.Chrome, data_inicial: datetime, data_final: datetime):
         print(f"Solicitando arquivos. Período {data_inicial.strftime('%d/%m/%Y')} - {data_final.strftime('%d/%m/%Y')}")
 
@@ -101,7 +83,7 @@ class eSocialXML():
         navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').clear()
         navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').send_keys(data_final.strftime('%d/%m/%Y'))
 
-        #navegador.find_element(By.XPATH, '//*[@id="btnSalvar"]').click()
+        navegador.find_element(By.XPATH, '//*[@id="btnSalvar"]').click()
     
     def solicitar_dados_esocial(self, navegador: webdriver.Chrome, intervalo_dias: int, periodos = False):
         print("Iniciando cadastro de solicitações")
@@ -140,7 +122,7 @@ class eSocialXML():
             # Solicita todos os eventos da data atual até o início do e-Social (01/01/2018) em intervalos de tempo pré-definidos
             solicitacoes = 0
             while data_inicio_periodo > data_inicio_esocial:
-                self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+                #self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
 
                 data_fim_periodo = data_inicio_periodo - timedelta(days=1)
                 data_inicio_periodo = data_inicio_periodo - timedelta(days=intervalo_dias)
@@ -148,7 +130,7 @@ class eSocialXML():
                 solicitacoes = solicitacoes + 1
 
             data_inicio_periodo = data_inicio_esocial
-            self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+            #self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
 
             solicitacoes = solicitacoes + 1
 
@@ -164,24 +146,19 @@ class eSocialXML():
         print("---------------------------------------------")
         navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
         navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
-        print("1")
         
         lista = list(range(1, solicitacoes))
         lista_downloads = []
         lista_reprocessamento = []
         periodos = {}
-        print("2")
         
         erros_registrados = {}
         for i in lista:
-            print("3")
             status = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[5]').text
             numero_solicitacao = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[1]').text
             periodo = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[4]').text
-            print("4")
             data_inicial = periodo.split("\n")[0].replace(" ","").replace("DataInicial:","")
             data_final = periodo.split("\n")[1].replace(" ","").replace("DataFinal:","")
-            print("5")
             periodos[numero_solicitacao] = {
                 "data_inicial": data_inicial,
                 "data_final": data_final,
@@ -207,8 +184,7 @@ class eSocialXML():
 
                 navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
                 navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
-
-                i = periodo[item]["indice"]
+                i = periodo[int(item)]["indice"]
                 
                 status = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[5]').text
                 numero_solicitacao = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[1]').text
@@ -288,12 +264,10 @@ class eSocialXML():
     def configura_conexao_esocial(self,usuario,senha,certificado,tipo_certificado = "A1"):
         '''Configura conexão da classe com o portal e-Social'''
         self.usuario_esocial, self.senha_esocial, self.certificado_esocial, self.tipo_certificado_esocial = usuario, senha, certificado, tipo_certificado
-        self.salvar_parametros()
 
     def configura_conexao_dominio(self,banco,usuario,senha,empresa_padrao = "9999"):
         '''Configura conexão da classe com o banco Domínio'''
         self.base_dominio, self.usuario_dominio, self.senha_dominio, self.empresa_padrao_rubricas = banco, usuario, senha, empresa_padrao
-        self.salvar_parametros()
 
     def extrair_arquivos_xml(self):
         '''Extrai os arquivos .zip que foram baixados do Portal e-Social'''
@@ -1967,22 +1941,25 @@ class eSocialXML():
         """
         retorna o ano que a conversão está sendo feita
         """
-        empresas = Empresas()
-        empresas.connect(self.__main_database)
+        try:
+            empresas = Empresas()
+            empresas.connect(self.__main_database)
 
-        data = empresas.select().dicts().where(Empresas.inscricao == self.__inscricao)
-        year = ''
-        for line in data:
-            year = line['ano_conversao']
+            data = empresas.select().dicts().where(Empresas.inscricao == self.__inscricao)
+            year = ''
+            for line in data:
+                year = line['ano_conversao']
 
-        # se não tiver um ano informado, atribui o ano corrente
-        if not year:
-            year = str(get_current_day().year)
-            empresa = empresas.get(Empresas.inscricao == self.__inscricao)
-            empresa.ano_conversao = year
-            empresa.save()
+            # se não tiver um ano informado, atribui o ano corrente
+            if not year:
+                year = str(get_current_day().year)
+                empresa = empresas.get(Empresas.inscricao == self.__inscricao)
+                empresa.ano_conversao = year
+                empresa.save()
 
-        return year
+            return year
+        except:
+            return get_current_day().year
 
 
 def get_incidencia_inss(incidencia):
