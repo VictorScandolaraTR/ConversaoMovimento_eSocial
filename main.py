@@ -155,17 +155,7 @@ class eSocial(QMainWindow):
                 "inscricao": df.loc[i, "inscricao"],
                 "codi_emp": codi_emp,
                 "nome_emp": df.loc[i, "nome_emp"],
-                "status": df.loc[i, "status"],
-                "base_dominio": df.loc[i, "base_dominio"],
-                "usuario_dominio": df.loc[i, "usuario_dominio"],
-                "senha_dominio": df.loc[i, "senha_dominio"],
-                "empresa_padrao_rubricas": df.loc[i, "empresa_padrao_rubricas"],
-                "usuario_esocial": df.loc[i, "usuario_esocial"],
-                "senha_esocial": df.loc[i, "senha_esocial"],
-                "certificado_esocial": df.loc[i, "certificado_esocial"],
-                "tipo_certificado_esocial": df.loc[i, "tipo_certificado_esocial"],
-                "usuario_sgd": df.loc[i, "usuario_sgd"],
-                "senha_sgd": df.loc[i, "senha_sgd"]
+                "status": df.loc[i, "status"]
             }
 
         empresas_em_uso = []
@@ -199,7 +189,7 @@ class eSocial(QMainWindow):
                     case "P":
                         status = "Planilha de rubricas geradas"
                     case "R":
-                        status = "Processo concluído"
+                        status = "Conversão concluída"
 
                 self.__tabela_empresas.setItem(linha, 3, QTableWidgetItem(status))
 
@@ -497,6 +487,7 @@ class eSocial(QMainWindow):
         self.seleciona_registro()
 
     def executar_rpa(self):
+        self.atualiza_status("Iniciando RPA...")
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
 
         esocial = eSocialXML(self.__diretorio_trabalho, inscricao, self.__parametros)
@@ -526,16 +517,17 @@ class eSocial(QMainWindow):
             print(success, 'ERROR:    ', message)
             if success:
                 components_ui.message_sucess(self.__widget, 'Processo finalizado!')
+                self.atualiza_status("Conversão concluída","R")
                 self.set_progress('Processo completo...', 100)
             else:
                 components_ui.message_error(self.__widget, message)
+                self.atualiza_status('Erro ao executar RPA')
                 self.set_progress('Erro ao executar RPA...', 0)
 
         def update_progress(progress):
             self.set_progress(progress[0], progress[1])
 
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
-        indice = str(self.__tabela_empresas.selectedItems()[0].row())
 
         esocial = eSocialXML(self.__diretorio_trabalho, inscricao, self.__parametros)
 

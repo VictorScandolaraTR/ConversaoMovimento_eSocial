@@ -1,0 +1,4 @@
+INFO:root:28/02/2023 14:03:29:Execução iniciada
+ERROR:root:28/02/2023 14:03:54:calculo:Erro durante execução da maquina 127.0.0.1 exceção: 'arquivo: agent.py - funcao: write - linha: 1925 - erro: send click message failed'
+ERROR:root:28/02/2023 14:04:59:calculo:Arquivo rpa.py, linha 419, erro: [WinError 10053] Uma conexão estabelecida foi anulada pelo software no computador host
+INFO:root:28/02/2023 14:04:59:Execução finalizada

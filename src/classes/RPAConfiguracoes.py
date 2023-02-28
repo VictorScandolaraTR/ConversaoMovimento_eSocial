@@ -1,7 +1,7 @@
 from PySide6.QtCore import Signal, QThread
 from PySide6.QtWidgets import QMainWindow
 
-from src.ui.dialog_rpa import UI_dialog_rpa as DialogRPA
+from src.ui.dialog_rpa import Ui_dialog_rpa as DialogRPA
 from src.controllers.rpa_controller import Controller
 import src.ui.components_ui as components_ui
 
@@ -24,7 +24,6 @@ class RPAConfiguracoes(QMainWindow):
 
         self.checkbox_run_local = self.__window.checkbox__run_local
         self.button_run_in_network = self.__window.checkbox__run_in_network
-        self.label_run_network = self.__window.label__run_in_network
         self.listbox_options_machines = self.__window.listbox__options_machines
         self.progressbar_rpa = self.__window.progressbar__rpa
         self.label_progressbar = self.__window.label__action_progress
@@ -41,13 +40,11 @@ class RPAConfiguracoes(QMainWindow):
 
     def execute_in_vm(self):
         if self.button_run_in_network.isChecked():
-            self.label_run_network.setEnabled(True)
             self.listbox_options_machines.setEnabled(True)
             self.button_run_rpa.setEnabled(False)
             self.button_run_in_network.setEnabled(False)
             self.list_agents()
         else:
-            self.label_run_network.setEnabled(False)
             self.listbox_options_machines.setEnabled(False)
 
     def list_agents(self):

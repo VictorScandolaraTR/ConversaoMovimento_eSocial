@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>MainWindow</class>
- <widget class="QMainWindow" name="MainWindow">
+ <class>dialog_rpa</class>
+ <widget class="QMainWindow" name="dialog_rpa">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>563</width>
-    <height>345</height>
+    <width>690</width>
+    <height>528</height>
    </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
   </property>
   <property name="windowTitle">
    <string>Configurar Execução RPA</string>
@@ -20,100 +26,193 @@
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
-   <layout class="QHBoxLayout" name="horizontalLayout">
-    <property name="spacing">
-     <number>5</number>
-    </property>
-    <property name="leftMargin">
-     <number>10</number>
-    </property>
-    <property name="topMargin">
-     <number>10</number>
-    </property>
-    <property name="rightMargin">
-     <number>10</number>
-    </property>
-    <property name="bottomMargin">
-     <number>10</number>
-    </property>
+   <property name="styleSheet">
+    <string notr="true">QMainWindow {
+    background-color: #cbcbca;
+}
+QMenuBar {
+    background-color: #a8a7a7;
+    font-size: 14px;
+}
+QMenu {
+    font-size: 14px;
+}
+QLabel {
+    font-size: 13px;
+}
+QCheckBox {
+    font-size: 13px;
+}
+QListWidget {
+    font-size: 13px; 
+}
+QPushButton {
+    border-radius: 5px;
+    background-color: #424242;
+    color: #f96400;
+    padding: 5px;
+    font-size: 13px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    border-radius: 3px;
+    height: 20px;
+    border: 1px solid;
+    padding: 2px;
+}
+QPushButton:hover {
+    background-color: #f96400;
+    color: #FFFFFF;
+}
+QLineEdit {
+    margin-bottom: 10px;
+    border-radius: 3px;
+    height: 20px;
+    border: 1px solid;
+    padding: 2px;
+}
+QDateEdit {
+    margin-bottom: 10px;
+    border-radius: 3px;
+    height: 20px;
+    border: 1px solid;
+    padding: 2px;
+}
+QHeaderView::section{
+     background-color: #e6e5e1;
+}
+QTableWidget{
+    background-color:#e8e8e8;
+}</string>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout">
     <item>
-     <layout class="QVBoxLayout" name="verticalLayout">
-      <item>
-       <widget class="QLabel" name="label__title">
-        <property name="text">
-         <string>CONFIGURAR EXECUÇÃO RPA</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignCenter</set>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <layout class="QFormLayout" name="formLayout">
-        <item row="3" column="0">
-         <widget class="QCheckBox" name="checkbox__run_in_network">
-          <property name="text">
-           <string>Executar em máquina na rede?</string>
-          </property>
-          <property name="checked">
-           <bool>false</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="4" column="0">
-         <widget class="QLabel" name="label__run_in_network">
-          <property name="text">
-           <string>Escolha uma ou mais máquinas:</string>
-          </property>
-         </widget>
-        </item>
-        <item row="4" column="1">
-         <widget class="QListWidget" name="listbox__options_machines">
-          <property name="selectionMode">
-           <enum>QAbstractItemView::MultiSelection</enum>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="0">
-         <widget class="QCheckBox" name="checkbox__run_local">
-          <property name="text">
-           <string>Executar na máquina local?</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <widget class="QProgressBar" name="progressbar__rpa">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="value">
-         <number>24</number>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="label__action_progress">
-        <property name="text">
-         <string/>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignCenter</set>
-        </property>
-       </widget>
-      </item>
-      <item alignment="Qt::AlignBottom">
-       <widget class="QPushButton" name="button__run_rpa">
-        <property name="text">
-         <string>INICIAR</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
+     <widget class="QFrame" name="frame">
+      <property name="frameShape">
+       <enum>QFrame::StyledPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Raised</enum>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout_3">
+       <item>
+        <widget class="QFrame" name="frame_5">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_4">
+          <item>
+           <widget class="QCheckBox" name="checkbox__run_local">
+            <property name="text">
+             <string>Executar na máquina local?</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="checkbox__run_in_network">
+            <property name="text">
+             <string>Executar em máquina na rede?</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox">
+         <property name="title">
+          <string>Escolha uma ou mais máquinas:</string>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <item>
+           <widget class="QListWidget" name="listbox__options_machines">
+            <property name="selectionMode">
+             <enum>QAbstractItemView::MultiSelection</enum>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QFrame" name="frame_2">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::StyledPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Raised</enum>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <widget class="QProgressBar" name="progressbar__rpa">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="value">
+          <number>24</number>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label__action_progress">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QFrame" name="frame_3">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::StyledPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Raised</enum>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <widget class="QPushButton" name="button__run_rpa">
+         <property name="text">
+          <string>INICIAR</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </item>
    </layout>
   </widget>

@@ -17,7 +17,7 @@ from src.database.data_rubrics import *
 from src.database.depara import *
 
 class eSocialXML():
-    def __init__(self, diretorio_trabalho, inscricao):
+    def __init__(self, diretorio_trabalho, inscricao, parametros):
         self.__inscricao = inscricao
         self.DIRETORIO_TRABALHO = f'{diretorio_trabalho}\\{inscricao}'
         self.DIRETORIO_RAIZ = self.DIRETORIO_TRABALHO
@@ -43,33 +43,18 @@ class eSocialXML():
         self.dicionario_s2399 = {} # Demissão (contribuintes)
 
         # Parâmetros de operação
-        self.carrega_parametros()
+        self.base_dominio = parametros["base_dominio"]
+        self.usuario_dominio = parametros["usuario_dominio"]
+        self.senha_dominio = parametros["senha_dominio"]
+        self.empresa_padrao_rubricas = parametros["empresa_padrao_rubricas"]
+        self.usuario_sgd = parametros["usuario_sgd"]
+        self.senha_sgd = parametros["senha_sgd"]
 
-        # cria as pastas necessÃ¡rias
+        # cria as pastas necessárias
         create_folder(self.DIRETORIO_XML)
         create_folder(self.DIRETORIO_DOWNLOADS)
         create_folder(self.DIRETORIO_RPA)
         create_folder(self.DIRETORIO_IMPORTAR)
-
-    def carrega_parametros(self):
-        """
-        Carrega os parametros utilizados do banco SQLite
-        """
-        diretorio_config_database = os.path.dirname(self.DIRETORIO_RAIZ)
-        engine = create_engine(f"sqlite:///{diretorio_config_database}/operacao.db")
-
-        df = pd.read_sql(f'SELECT * FROM EMPRESAS WHERE inscricao = {self.__inscricao}', con=engine)
-        for index in range(len(df)):
-            self.base_dominio = df.loc[index, "base_dominio"]
-            self.usuario_dominio = df.loc[index, "usuario_dominio"]
-            self.senha_dominio = df.loc[index, "senha_dominio"]
-            self.empresa_padrao_rubricas = df.loc[index, "empresa_padrao_rubricas"]
-            self.usuario_esocial = df.loc[index, "usuario_esocial"]
-            self.senha_esocial = df.loc[index, "senha_esocial"]
-            self.certificado_esocial = df.loc[index, "certificado_esocial"]
-            self.tipo_certificado_esocial = df.loc[index, "tipo_certificado_esocial"]
-            self.usuario_sgd = df.loc[index, "usuario_sgd"]
-            self.senha_sgd = df.loc[index, "senha_sgd"]
 
     def solicita_arquivos_periodo(self, navegador: webdriver.Chrome, data_inicial: datetime, data_final: datetime):
         print(f"Solicitando arquivos. Período {data_inicial.strftime('%d/%m/%Y')} - {data_final.strftime('%d/%m/%Y')}")
@@ -87,7 +72,7 @@ class eSocialXML():
     
     def solicitar_dados_esocial(self, navegador: webdriver.Chrome, intervalo_dias: int, periodos = False):
         print("Iniciando cadastro de solicitações")
-        data_inicio_esocial = datetime.strptime('01/01/2018','%d/%m/%Y')
+        data_inicio_esocial = datetime.strptime('01/01/2020','%d/%m/%Y')
 
         if(periodos):
             # Aqui refaz a solicitação de períodos que deram erro dividindo em períodos menores

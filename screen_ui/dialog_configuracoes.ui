@@ -6,235 +6,280 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>551</width>
-    <height>233</height>
+    <width>727</width>
+    <height>495</height>
    </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>727</width>
+    <height>495</height>
+   </size>
   </property>
   <property name="windowTitle">
    <string>Configurações</string>
   </property>
-  <widget class="QGroupBox" name="groupBox_2">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>10</y>
-     <width>531</width>
-     <height>181</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>Configurações Domínio</string>
-   </property>
-   <widget class="QLineEdit" name="edit_usuario_dominio">
-    <property name="geometry">
-     <rect>
-      <x>200</x>
-      <y>80</y>
-      <width>113</width>
-      <height>20</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="edit_banco_dominio">
-    <property name="geometry">
-     <rect>
-      <x>200</x>
-      <y>50</y>
-      <width>113</width>
-      <height>20</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="edit_senha_dominio">
-    <property name="geometry">
-     <rect>
-      <x>200</x>
-      <y>110</y>
-      <width>113</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="echoMode">
-     <enum>QLineEdit::PasswordEchoOnEdit</enum>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_5">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>80</y>
-      <width>181</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Usuário Domínio Folha</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_6">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>110</y>
-      <width>181</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Senha Domínio Folha</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_7">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>50</y>
-      <width>181</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Banco de dados Domínio Folha</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="edit_usuario_sgd">
-    <property name="geometry">
-     <rect>
-      <x>410</x>
-      <y>50</y>
-      <width>113</width>
-      <height>20</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_8">
-    <property name="geometry">
-     <rect>
-      <x>330</x>
-      <y>80</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Senha SGD</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_9">
-    <property name="geometry">
-     <rect>
-      <x>330</x>
-      <y>50</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Usuário SGD</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="edit_senha_sgd">
-    <property name="geometry">
-     <rect>
-      <x>410</x>
-      <y>80</y>
-      <width>113</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="echoMode">
-     <enum>QLineEdit::PasswordEchoOnEdit</enum>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_10">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>140</y>
-      <width>181</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Empresa rubricas</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="edit_empresa_rubricas_dominio">
-    <property name="geometry">
-     <rect>
-      <x>200</x>
-      <y>140</y>
-      <width>113</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="echoMode">
-     <enum>QLineEdit::Normal</enum>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="edit_diretorio_trabalho">
-    <property name="geometry">
-     <rect>
-      <x>200</x>
-      <y>20</y>
-      <width>271</width>
-      <height>20</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="btn_diretorio_trabalho">
-    <property name="geometry">
-     <rect>
-      <x>470</x>
-      <y>20</y>
-      <width>51</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Buscar</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_11">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>20</y>
-      <width>181</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Diretório de trabalho</string>
-    </property>
-   </widget>
-  </widget>
-  <widget class="QPushButton" name="btn_concertar_configuracoes">
-   <property name="geometry">
-    <rect>
-     <x>300</x>
-     <y>200</y>
-     <width>75</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Cancelar</string>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="btn_confirmar_configuracoes">
-   <property name="geometry">
-    <rect>
-     <x>400</x>
-     <y>200</y>
-     <width>75</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Confirmar</string>
-   </property>
-  </widget>
+  <property name="styleSheet">
+   <string notr="true">QMainWindow {
+    background-color: #cbcbca;
+}
+QMenuBar {
+    background-color: #a8a7a7;
+    font-size: 14px;
+}
+QMenu {
+    font-size: 14px;
+}
+QLabel {
+    font-size: 13px;
+}
+QCheckBox {
+    font-size: 13px;
+}
+QListWidget {
+    font-size: 13px; 
+}
+QPushButton {
+    border-radius: 5px;
+    background-color: #424242;
+    color: #f96400;
+    padding: 5px;
+    font-size: 13px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    border-radius: 3px;
+    height: 20px;
+    border: 1px solid;
+    padding: 2px;
+}
+QPushButton:hover {
+    background-color: #f96400;
+    color: #FFFFFF;
+}
+QLineEdit {
+    margin-bottom: 10px;
+    border-radius: 3px;
+    height: 20px;
+    border: 1px solid;
+    padding: 2px;
+}
+QDateEdit {
+    margin-bottom: 10px;
+    border-radius: 3px;
+    height: 20px;
+    border: 1px solid;
+    padding: 2px;
+}
+QHeaderView::section{
+     background-color: #e6e5e1;
+}
+QTableWidget{
+    background-color:#e8e8e8;
+}</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QGroupBox" name="groupBox_7">
+     <property name="title">
+      <string>Diretório de trabalho</string>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_4">
+      <item>
+       <widget class="QLineEdit" name="edit_diretorio_trabalho"/>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btn_diretorio_trabalho">
+        <property name="text">
+         <string>Buscar</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="frame_2">
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_3">
+      <item>
+       <widget class="QFrame" name="frame_4">
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Raised</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_2">
+         <item>
+          <widget class="QGroupBox" name="groupBox_6">
+           <property name="title">
+            <string>Banco de dados Domínio Folha</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_12">
+            <item>
+             <widget class="QLineEdit" name="edit_banco_dominio">
+              <property name="placeholderText">
+               <string/>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_5">
+           <property name="title">
+            <string>Usuário Domínio Folha</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_13">
+            <item>
+             <widget class="QLineEdit" name="edit_usuario_dominio"/>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_4">
+           <property name="title">
+            <string>Senha Domínio Folha</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_11">
+            <item>
+             <widget class="QLineEdit" name="edit_senha_dominio">
+              <property name="echoMode">
+               <enum>QLineEdit::PasswordEchoOnEdit</enum>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_3">
+           <property name="title">
+            <string>Empresa rubricas</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_9">
+            <item>
+             <widget class="QLineEdit" name="edit_empresa_rubricas_dominio">
+              <property name="echoMode">
+               <enum>QLineEdit::Normal</enum>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <spacer name="verticalSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="frame_5">
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Raised</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_3">
+         <item>
+          <widget class="QGroupBox" name="groupBox_2">
+           <property name="title">
+            <string>Usuário SGD</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_10">
+            <item>
+             <widget class="QLineEdit" name="edit_usuario_sgd"/>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox">
+           <property name="title">
+            <string>Senha SGD</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_8">
+            <item>
+             <widget class="QLineEdit" name="edit_senha_sgd">
+              <property name="echoMode">
+               <enum>QLineEdit::PasswordEchoOnEdit</enum>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <spacer name="verticalSpacer_2">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="frame">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout">
+      <item>
+       <widget class="QPushButton" name="btn_concertar_configuracoes">
+        <property name="text">
+         <string>Cancelar</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btn_confirmar_configuracoes">
+        <property name="text">
+         <string>Confirmar</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
  </widget>
  <resources/>
  <connections/>
