@@ -445,6 +445,8 @@ class eSocial(QMainWindow):
         self.atualiza_status("Consultando banco de dados Domínio...")
         indice = str(self.__tabela_empresas.selectedItems()[0].row())
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
+
+        conversao_cadastral = components_ui.confirm_message(self.__widget,"Deseja converter os cadastros da empresa?")
         
         esocial = eSocialXML(self.__diretorio_trabalho, inscricao, self.__parametros)
 
@@ -452,10 +454,27 @@ class eSocial(QMainWindow):
         indice = self.__tabela_empresas.selectedItems()[0].row()
 
         if (len(empresas) == 1):
-            self.__tabela_empresas.selectedItems()[1].setText(str(empresas[0]["codigo"]))
-            self.__tabela_empresas.selectedItems()[2].setText(str(empresas[0]["nome"]))
-            self.__empresas[str(indice)]["codi_emp"] = str(empresas[0]["codigo"])
-            self.__empresas[str(indice)]["nome_emp"] = str(empresas[0]["nome"])
+            codi_emp = str(empresas[0]["codigo"])
+            nome_emp = str(empresas[0]["nome"])
+
+            if conversao_cadastral:
+                conversao_cadastral = components_ui.confirm_message(
+                    self.__widget,
+                    f"Encontramos a empresa {nome_emp} com o código {codi_emp} no banco Domínio que corresponde aos dados encontrados no e-Social.\nDeseja converter os cadastros mesmo assim?"
+                )
+            
+            self.__tabela_empresas.selectedItems()[1].setText(codi_emp)
+            self.__tabela_empresas.selectedItems()[2].setText(nome_emp)
+            self.__empresas[str(indice)]["codi_emp"] = codi_emp
+            self.__empresas[str(indice)]["nome_emp"] = nome_emp
+
+            conexao = self.__engine.connect()
+            conexao.execute("UPDATE EMPRESAS SET codi_emp = {codi_emp}, nome_emp = '{nome_emp}' "\
+                            "WHERE inscricao = '{inscricao}'".format(
+                                codi_emp = int(codi_emp),
+                                nome_emp = nome_emp,
+                                inscricao = inscricao
+                            ))
         else:
             print("Mais de um resultado")
             self.__tabela_empresas.selectedItems()[1].setText(str(empresas[0]["codigo"]))
@@ -463,13 +482,13 @@ class eSocial(QMainWindow):
             self.__empresas[str(indice)]["codi_emp"] = str(empresas[0]["codigo"])
             self.__empresas[str(indice)]["nome_emp"] = str(empresas[0]["nome"])
 
-        conexao = self.__engine.connect()
-        conexao.execute("UPDATE EMPRESAS SET codi_emp = {codi_emp}, nome_emp = '{nome_emp}' "\
-                        "WHERE inscricao = '{inscricao}'".format(
-                            codi_emp = empresas[0]["codigo"],
-                            nome_emp = empresas[0]["nome"],
-                            inscricao = inscricao
-                        ))
+            conexao = self.__engine.connect()
+            conexao.execute("UPDATE EMPRESAS SET codi_emp = {codi_emp}, nome_emp = '{nome_emp}' "\
+                            "WHERE inscricao = '{inscricao}'".format(
+                                codi_emp = empresas[0]["codigo"],
+                                nome_emp = empresas[0]["nome"],
+                                inscricao = inscricao
+                            ))
         self.atualiza_status("Dados carregados do Domínio","D")
         self.seleciona_registro()
 

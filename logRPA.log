@@ -1,37 +1,5 @@
-2023-02-28 14:03:44,888:INFO:agent.py:Lendo os dados que precisam ser calculados(férias, rescisões e demais folhas)
-2023-02-28 14:03:46,045:DEBUG:peewee.py:('CREATE TABLE IF NOT EXISTS "dominio_rescisao" ("id" INTEGER NOT NULL PRIMARY KEY, "codi_emp" INTEGER, "i_empregados" INTEGER, "competencia" DATE, "data_demissao" DATE, "motivo" VARCHAR(1), "data_pagamento" DATE, "aviso_previo" INTEGER, "data_aviso" DATE, "dias_projecao_aviso" REAL)', [])
-2023-02-28 14:03:46,046:DEBUG:peewee.py:('SELECT "t1"."id", "t1"."codi_emp", "t1"."i_empregados", "t1"."competencia", "t1"."data_demissao", "t1"."motivo", "t1"."data_pagamento", "t1"."aviso_previo", "t1"."data_aviso", "t1"."dias_projecao_aviso" FROM "dominio_rescisao" AS "t1"', [])
-2023-02-28 14:03:46,048:DEBUG:peewee.py:('CREATE TABLE IF NOT EXISTS "dominio_ferias" ("id" INTEGER NOT NULL PRIMARY KEY, "codi_emp" INTEGER, "i_empregados" INTEGER, "competencia" DATE, "inicio_aquisitivo" DATE, "fim_aquisitivo" DATE, "inicio_gozo" DATE, "fim_gozo" DATE, "abono_paga" VARCHAR(255), "inicio_abono" DATE, "fim_abono" DATE, "data_pagamento" DATE, "rubrica" INTEGER, "valor_informado" REAL, "valor_calculado" REAL)', [])
-2023-02-28 14:03:46,049:DEBUG:peewee.py:('SELECT "t1"."id", "t1"."codi_emp", "t1"."i_empregados", "t1"."competencia", "t1"."inicio_aquisitivo", "t1"."fim_aquisitivo", "t1"."inicio_gozo", "t1"."fim_gozo", "t1"."abono_paga", "t1"."inicio_abono", "t1"."fim_abono", "t1"."data_pagamento", "t1"."rubrica", "t1"."valor_informado", "t1"."valor_calculado" FROM "dominio_ferias" AS "t1"', [])
-2023-02-28 14:03:46,884:INFO:agent.py:Abrindo sistema usuário: GERENTE senha: gerente conexão: movto_esocial
-2023-02-28 14:03:47,895:INFO:agent.py:Escrevendo texto FOLHA
-2023-02-28 14:03:49,016:INFO:agent.py:Aguardando tela de login contábil
-2023-02-28 14:03:53,289:INFO:agent.py:
-2023-02-28 14:03:54,290:INFO:agent.py:Preenchendo usuário: GERENTE
-2023-02-28 14:03:54,290:INFO:agent.py:Escrevendo texto GERENTE
-2023-02-28 14:03:54,295:INFO:agent.py:Enviando mensagem para o Host arquivo: agent.py - funcao: write - linha: 1925 - erro: send click message failed
-2023-02-28 14:03:54,295:ERROR:agent.py:Erro escrevendo o texto GERENTE
-2023-02-28 14:03:55,296:INFO:agent.py:Preenchendo senha: gerente
-2023-02-28 14:03:55,296:INFO:agent.py:Escrevendo texto gerente
-2023-02-28 14:03:58,338:INFO:agent.py:Escrevendo texto gerente
-2023-02-28 14:04:00,409:INFO:agent.py:Preenchendo conexão: movto_esocial
-2023-02-28 14:04:00,409:INFO:agent.py:Escrevendo texto movto_esocial
-2023-02-28 14:04:03,452:INFO:agent.py:Escrevendo texto movto_esocial
-2023-02-28 14:04:05,614:INFO:agent.py:Aguardando abertura do contábil
-2023-02-28 14:04:18,882:INFO:agent.py:Verificando Avisos
-2023-02-28 14:04:29,916:INFO:agent.py:Verificando e fechando janelas com 'ESC', contador 0
-2023-02-28 14:04:30,927:INFO:agent.py:Verificando e fechando janelas com 'ESC', contador 1
-2023-02-28 14:04:31,938:INFO:agent.py:Verificando e fechando janelas com 'ESC', contador 2
-2023-02-28 14:04:32,949:INFO:agent.py:Verificando e fechando janelas com 'ESC', contador 3
-2023-02-28 14:04:33,960:INFO:agent.py:Verificando e fechando janelas com 'ESC', contador 4
-2023-02-28 14:04:34,972:INFO:agent.py:Verificando e fechando janelas com 'ESC', contador 5
-2023-02-28 14:04:35,983:INFO:agent.py:Verificando e fechando janelas com 'ESC', contador 6
-2023-02-28 14:04:36,994:INFO:agent.py:Verificando e fechando janelas com 'ESC', contador 7
-2023-02-28 14:04:38,005:INFO:agent.py:Verificando e fechando janelas com 'ESC', contador 8
-2023-02-28 14:04:39,015:INFO:agent.py:Verificando e fechando janelas com 'ESC', contador 9
-2023-02-28 14:04:50,618:INFO:agent.py:Enviando mensagem para o Host null
-2023-02-28 14:04:50,618:INFO:agent.py:Enviando mensagem para o Host arquivo: agent.py - funcao: main - linha: 146 - erro: [WinError 10053] Uma conexão estabelecida foi anulada pelo software no computador host
-2023-02-28 14:04:50,618:WARNING:agent.py:Falha ao enviar mensagem
-2023-02-28 14:04:50,618:WARNING:agent.py:Refazendo a conexão com o HOST
-2023-02-28 14:04:52,620:INFO:agent.py:Tentando enviar novamente a mensagem
-2023-02-28 14:04:52,621:INFO:agent.py:Mensagem enviada com sucesso
+2023-03-01 11:14:08,626:INFO:agent.py:Lendo os dados que precisam ser calculados(férias, rescisões e demais folhas)
+2023-03-01 11:14:08,844:DEBUG:peewee.py:('CREATE TABLE IF NOT EXISTS "dominio_rescisao" ("id" INTEGER NOT NULL PRIMARY KEY, "codi_emp" INTEGER, "i_empregados" INTEGER, "competencia" DATE, "data_demissao" DATE, "motivo" VARCHAR(1), "data_pagamento" DATE, "aviso_previo" INTEGER, "data_aviso" DATE, "dias_projecao_aviso" REAL)', [])
+2023-03-01 11:14:08,847:DEBUG:peewee.py:('SELECT "t1"."id", "t1"."codi_emp", "t1"."i_empregados", "t1"."competencia", "t1"."data_demissao", "t1"."motivo", "t1"."data_pagamento", "t1"."aviso_previo", "t1"."data_aviso", "t1"."dias_projecao_aviso" FROM "dominio_rescisao" AS "t1"', [])
+2023-03-01 11:14:08,849:DEBUG:peewee.py:('CREATE TABLE IF NOT EXISTS "dominio_ferias" ("id" INTEGER NOT NULL PRIMARY KEY, "codi_emp" INTEGER, "i_empregados" INTEGER, "competencia" DATE, "inicio_aquisitivo" DATE, "fim_aquisitivo" DATE, "inicio_gozo" DATE, "fim_gozo" DATE, "abono_paga" VARCHAR(255), "inicio_abono" DATE, "fim_abono" DATE, "data_pagamento" DATE, "rubrica" INTEGER, "valor_informado" REAL, "valor_calculado" REAL)', [])
+2023-03-01 11:14:08,851:DEBUG:peewee.py:('SELECT "t1"."id", "t1"."codi_emp", "t1"."i_empregados", "t1"."competencia", "t1"."inicio_aquisitivo", "t1"."fim_aquisitivo", "t1"."inicio_gozo", "t1"."fim_gozo", "t1"."abono_paga", "t1"."inicio_abono", "t1"."fim_abono", "t1"."data_pagamento", "t1"."rubrica", "t1"."valor_informado", "t1"."valor_calculado" FROM "dominio_ferias" AS "t1"', [])
