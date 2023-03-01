@@ -15,17 +15,17 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QDialog, QFrame, QGroupBox,
-    QHBoxLayout, QLineEdit, QPushButton, QSizePolicy,
+from PySide6.QtWidgets import (QApplication, QFrame, QGroupBox, QHBoxLayout,
+    QLineEdit, QMainWindow, QPushButton, QSizePolicy,
     QSpacerItem, QVBoxLayout, QWidget)
 
-class Ui_dialog_configuracioes(object):
-    def setupUi(self, dialog_configuracioes):
-        if not dialog_configuracioes.objectName():
-            dialog_configuracioes.setObjectName(u"dialog_configuracioes")
-        dialog_configuracioes.resize(727, 495)
-        dialog_configuracioes.setMinimumSize(QSize(727, 495))
-        dialog_configuracioes.setStyleSheet(u"QMainWindow {\n"
+class Ui_MainWindow(object):
+    def setupUi(self, MainWindow):
+        if not MainWindow.objectName():
+            MainWindow.setObjectName(u"MainWindow")
+        MainWindow.resize(520, 495)
+        MainWindow.setMinimumSize(QSize(520, 495))
+        MainWindow.setStyleSheet(u"QMainWindow {\n"
 "    background-color: #cbcbca;\n"
 "}\n"
 "QMenuBar {\n"
@@ -61,6 +61,10 @@ class Ui_dialog_configuracioes(object):
 "    background-color: #f96400;\n"
 "    color: #FFFFFF;\n"
 "}\n"
+"QPushButton:disabled {\n"
+"    background-color: #666666;\n"
+"    color: #DDDDDD;\n"
+"}\n"
 "QLineEdit {\n"
 "    margin-bottom: 10px;\n"
 "    border-radius: 3px;\n"
@@ -70,21 +74,23 @@ class Ui_dialog_configuracioes(object):
 "}\n"
 "QDateEdit {\n"
 "    margin-bottom: 10px;\n"
-"    border-radius: 3px;\n"
+"    border-r"
+                        "adius: 3px;\n"
 "    height: 20px;\n"
 "    border: 1px solid;\n"
 "    padding: 2px;\n"
 "}\n"
-""
-                        "QHeaderView::section{\n"
+"QHeaderView::section{\n"
 "     background-color: #e6e5e1;\n"
 "}\n"
 "QTableWidget{\n"
 "    background-color:#e8e8e8;\n"
 "}")
-        self.verticalLayout = QVBoxLayout(dialog_configuracioes)
+        self.centralwidget = QWidget(MainWindow)
+        self.centralwidget.setObjectName(u"centralwidget")
+        self.verticalLayout = QVBoxLayout(self.centralwidget)
         self.verticalLayout.setObjectName(u"verticalLayout")
-        self.groupBox_7 = QGroupBox(dialog_configuracioes)
+        self.groupBox_7 = QGroupBox(self.centralwidget)
         self.groupBox_7.setObjectName(u"groupBox_7")
         self.horizontalLayout_4 = QHBoxLayout(self.groupBox_7)
         self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
@@ -101,7 +107,7 @@ class Ui_dialog_configuracioes(object):
 
         self.verticalLayout.addWidget(self.groupBox_7)
 
-        self.frame_2 = QFrame(dialog_configuracioes)
+        self.frame_2 = QFrame(self.centralwidget)
         self.frame_2.setObjectName(u"frame_2")
         self.frame_2.setFrameShape(QFrame.StyledPanel)
         self.frame_2.setFrameShadow(QFrame.Raised)
@@ -211,7 +217,7 @@ class Ui_dialog_configuracioes(object):
 
         self.verticalLayout.addWidget(self.frame_2)
 
-        self.frame = QFrame(dialog_configuracioes)
+        self.frame = QFrame(self.centralwidget)
         self.frame.setObjectName(u"frame")
         sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -235,24 +241,25 @@ class Ui_dialog_configuracioes(object):
 
         self.verticalLayout.addWidget(self.frame)
 
+        MainWindow.setCentralWidget(self.centralwidget)
 
-        self.retranslateUi(dialog_configuracioes)
+        self.retranslateUi(MainWindow)
 
-        QMetaObject.connectSlotsByName(dialog_configuracioes)
+        QMetaObject.connectSlotsByName(MainWindow)
     # setupUi
 
-    def retranslateUi(self, dialog_configuracioes):
-        dialog_configuracioes.setWindowTitle(QCoreApplication.translate("dialog_configuracioes", u"Configura\u00e7\u00f5es", None))
-        self.groupBox_7.setTitle(QCoreApplication.translate("dialog_configuracioes", u"Diret\u00f3rio de trabalho", None))
-        self.btn_diretorio_trabalho.setText(QCoreApplication.translate("dialog_configuracioes", u"Buscar", None))
-        self.groupBox_6.setTitle(QCoreApplication.translate("dialog_configuracioes", u"Banco de dados Dom\u00ednio Folha", None))
+    def retranslateUi(self, MainWindow):
+        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
+        self.groupBox_7.setTitle(QCoreApplication.translate("MainWindow", u"Diret\u00f3rio de trabalho", None))
+        self.btn_diretorio_trabalho.setText(QCoreApplication.translate("MainWindow", u"Buscar", None))
+        self.groupBox_6.setTitle(QCoreApplication.translate("MainWindow", u"Banco de dados Dom\u00ednio Folha", None))
         self.edit_banco_dominio.setPlaceholderText("")
-        self.groupBox_5.setTitle(QCoreApplication.translate("dialog_configuracioes", u"Usu\u00e1rio Dom\u00ednio Folha", None))
-        self.groupBox_4.setTitle(QCoreApplication.translate("dialog_configuracioes", u"Senha Dom\u00ednio Folha", None))
-        self.groupBox_3.setTitle(QCoreApplication.translate("dialog_configuracioes", u"Empresa rubricas", None))
-        self.groupBox_2.setTitle(QCoreApplication.translate("dialog_configuracioes", u"Usu\u00e1rio SGD", None))
-        self.groupBox.setTitle(QCoreApplication.translate("dialog_configuracioes", u"Senha SGD", None))
-        self.btn_concertar_configuracoes.setText(QCoreApplication.translate("dialog_configuracioes", u"Cancelar", None))
-        self.btn_confirmar_configuracoes.setText(QCoreApplication.translate("dialog_configuracioes", u"Confirmar", None))
+        self.groupBox_5.setTitle(QCoreApplication.translate("MainWindow", u"Usu\u00e1rio Dom\u00ednio Folha", None))
+        self.groupBox_4.setTitle(QCoreApplication.translate("MainWindow", u"Senha Dom\u00ednio Folha", None))
+        self.groupBox_3.setTitle(QCoreApplication.translate("MainWindow", u"Empresa rubricas", None))
+        self.groupBox_2.setTitle(QCoreApplication.translate("MainWindow", u"Usu\u00e1rio SGD", None))
+        self.groupBox.setTitle(QCoreApplication.translate("MainWindow", u"Senha SGD", None))
+        self.btn_concertar_configuracoes.setText(QCoreApplication.translate("MainWindow", u"Cancelar", None))
+        self.btn_confirmar_configuracoes.setText(QCoreApplication.translate("MainWindow", u"Confirmar", None))
     # retranslateUi
 

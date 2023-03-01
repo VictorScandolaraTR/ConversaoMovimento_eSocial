@@ -30,14 +30,7 @@ class Ui_dialog_rpa(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(dialog_rpa.sizePolicy().hasHeightForWidth())
         dialog_rpa.setSizePolicy(sizePolicy)
-        self.centralwidget = QWidget(dialog_rpa)
-        self.centralwidget.setObjectName(u"centralwidget")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-        sizePolicy1.setHorizontalStretch(0)
-        sizePolicy1.setVerticalStretch(0)
-        sizePolicy1.setHeightForWidth(self.centralwidget.sizePolicy().hasHeightForWidth())
-        self.centralwidget.setSizePolicy(sizePolicy1)
-        self.centralwidget.setStyleSheet(u"QMainWindow {\n"
+        dialog_rpa.setStyleSheet(u"QMainWindow {\n"
 "    background-color: #cbcbca;\n"
 "}\n"
 "QMenuBar {\n"
@@ -94,6 +87,14 @@ class Ui_dialog_rpa(object):
 "QTableWidget{\n"
 "    background-color:#e8e8e8;\n"
 "}")
+        self.centralwidget = QWidget(dialog_rpa)
+        self.centralwidget.setObjectName(u"centralwidget")
+        sizePolicy1 = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        sizePolicy1.setHorizontalStretch(0)
+        sizePolicy1.setVerticalStretch(0)
+        sizePolicy1.setHeightForWidth(self.centralwidget.sizePolicy().hasHeightForWidth())
+        self.centralwidget.setSizePolicy(sizePolicy1)
+        self.centralwidget.setStyleSheet(u"")
         self.verticalLayout = QVBoxLayout(self.centralwidget)
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.frame = QFrame(self.centralwidget)

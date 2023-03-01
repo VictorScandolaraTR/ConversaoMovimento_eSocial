@@ -24,10 +24,9 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(963, 637)
-        self.centralwidget = QWidget(MainWindow)
-        self.centralwidget.setObjectName(u"centralwidget")
-        self.centralwidget.setStyleSheet(u"QMainWindow {\n"
+        MainWindow.resize(1053, 470)
+        MainWindow.setMinimumSize(QSize(1050, 470))
+        MainWindow.setStyleSheet(u"QMainWindow {\n"
 "    background-color: #cbcbca;\n"
 "}\n"
 "QMenuBar {\n"
@@ -88,6 +87,9 @@ class Ui_MainWindow(object):
 "QTableWidget{\n"
 "    background-color:#e8e8e8;\n"
 "}")
+        self.centralwidget = QWidget(MainWindow)
+        self.centralwidget.setObjectName(u"centralwidget")
+        self.centralwidget.setStyleSheet(u"")
         self.horizontalLayout = QHBoxLayout(self.centralwidget)
         self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.frame_2 = QFrame(self.centralwidget)

@@ -19,15 +19,15 @@ from src.database.depara import *
 class eSocialXML():
     def __init__(self, diretorio_trabalho, inscricao, parametros):
         self.__inscricao = inscricao
-        self.DIRETORIO_TRABALHO = f'{diretorio_trabalho}\\{inscricao}'
+        self.DIRETORIO_TRABALHO = f'{diretorio_trabalho}/{inscricao}'
         self.DIRETORIO_RAIZ = self.DIRETORIO_TRABALHO
-        self.DIRETORIO_XML = f"{self.DIRETORIO_TRABALHO}\\eventos"
-        self.DIRETORIO_DOWNLOADS = f"{self.DIRETORIO_TRABALHO}\\downloads"
-        self.DIRETORIO_SAIDA = f"{self.DIRETORIO_TRABALHO}\\saida"
-        self.DIRETORIO_RPA = f"{self.DIRETORIO_TRABALHO}\\rpa"
-        self.DIRETORIO_IMPORTAR = f"{self.DIRETORIO_TRABALHO}\\rpa\\Importar"
-        self.BANCO_SQLITE = f"{self.DIRETORIO_TRABALHO}\\rpa\\query.db"
-        self.__main_database = f'.\\{diretorio_trabalho}\\operacao.db'
+        self.DIRETORIO_XML = f"{self.DIRETORIO_TRABALHO}/eventos"
+        self.DIRETORIO_DOWNLOADS = f"{self.DIRETORIO_TRABALHO}/downloads"
+        self.DIRETORIO_SAIDA = f"{self.DIRETORIO_TRABALHO}/saida"
+        self.DIRETORIO_RPA = f"{self.DIRETORIO_TRABALHO}/rpa"
+        self.DIRETORIO_IMPORTAR = f"{self.DIRETORIO_TRABALHO}/rpa/Importar"
+        self.BANCO_SQLITE = f"{self.DIRETORIO_TRABALHO}/rpa/query.db"
+        self.__main_database = f'.\\{diretorio_trabalho}/operacao.db'
 
         year = self.get_year_conversion()
         self.INIT_COMPETENCE = f'01/01/{year}'
