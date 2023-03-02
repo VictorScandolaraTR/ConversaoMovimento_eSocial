@@ -17,9 +17,9 @@ from src.database.data_rubrics import *
 from src.database.depara import *
 
 class eSocialXML():
-    def __init__(self, diretorio_trabalho, inscricao):
+    def __init__(self, diretorio_trabalho, inscricao, parametros):
         self.__inscricao = inscricao
-        self.DIRETORIO_TRABALHO = f'{diretorio_trabalho}\\{inscricao}'
+        self.DIRETORIO_TRABALHO = f'{diretorio_trabalho}/{inscricao}'
         self.DIRETORIO_RAIZ = self.DIRETORIO_TRABALHO
         self.DIRETORIO_XML = f"{self.DIRETORIO_TRABALHO}/eventos"
         self.DIRETORIO_DOWNLOADS = f"{self.DIRETORIO_TRABALHO}/downloads"
@@ -46,7 +46,12 @@ class eSocialXML():
         self.dicionario_s2399 = {} # Demissão (contribuintes)
 
         # Parâmetros de operação
-        self.carrega_parametros()
+        self.base_dominio = parametros["base_dominio"]
+        self.usuario_dominio = parametros["usuario_dominio"]
+        self.senha_dominio = parametros["senha_dominio"]
+        self.empresa_padrao_rubricas = parametros["empresa_padrao_rubricas"]
+        self.usuario_sgd = parametros["usuario_sgd"]
+        self.senha_sgd = parametros["senha_sgd"]
 
         # cria as pastas necessárias
         create_folder(self.DIRETORIO_XML)
@@ -594,7 +599,7 @@ class eSocialXML():
         print("Relacionando rubricas")
         for s1010 in tqdm(self.dicionario_s1010):
             inscricao = self.completar_cnpj(self.dicionario_s1010.get(s1010).get('ideEmpregador').get('nrInsc'))
-            
+
             if(inscricao==empresa):
                 codigo = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('ideRubrica').get('codRubr')
 
