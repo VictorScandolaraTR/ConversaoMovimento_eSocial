@@ -231,7 +231,7 @@ class eSocialXML():
             if(lotes["Erro"]>0)|(lotes["Nenhum evento encontrado"]>0):
                 intervalo_dias = intervalo_dias / 2
                 solicitacoes = self.solicitar_dados_esocial(navegador,intervalo_dias,periodos)
-                lista_downloads_redistribuidos, lotes, periodos = self.baixar_lotes_esocial(navegador,solicitacoes,lotes)
+                lista_downloads_redistribuidos, lotes, periodos = self.baixar_lotes_esocial(navegador, solicitacoes, lotes)
 
                 for download in lista_downloads_redistribuidos:
                     lista_downloads.append(download)
