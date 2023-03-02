@@ -228,18 +228,17 @@ class eSocialXML():
             # Consulta resultado das solicitações
             lista_downloads, lotes, periodos = self.baixar_lotes_esocial(navegador, solicitacoes, lotes)
 
-            if (lotes["Erro"]>0)|(lotes["Nenhum evento encontrado"]>0):
+            if(lotes["Erro"]>0)|(lotes["Nenhum evento encontrado"]>0):
                 intervalo_dias = intervalo_dias / 2
-                solicitacoes = self.solicitar_dados_esocial(navegador, intervalo_dias, periodos)
-                lista_downloads_redistribuidos, lotes, periodos = self.baixar_lotes_esocial(navegador, solicitacoes,
-                                                                                            lotes)
+                solicitacoes = self.solicitar_dados_esocial(navegador,intervalo_dias,periodos)
+                lista_downloads_redistribuidos, lotes, periodos = self.baixar_lotes_esocial(navegador,solicitacoes,lotes)
 
                 for download in lista_downloads_redistribuidos:
                     lista_downloads.append(download)
 
             for item in lista_downloads:
                 print(item)
-                shutil.copy2(f"{downloads_folder}\\{item}.zip", f"{self.DIRETORIO_DOWNLOADS}\\{item}.zip")
+                shutil.copy2(f"{downloads_folder}\\{item}.zip",f"{self.DIRETORIO_DOWNLOADS}\\{item}.zip")
 
             navegador.close()
         except Exception as e:
