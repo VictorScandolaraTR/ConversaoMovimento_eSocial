@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QMainWindow, QMessageBox
 from PySide6.QtCore import Signal
 import src.utils.components as components
 from src.ui.dialog_configuaracoes import Ui_MainWindow as DialogConfiguracoes
+import src.ui.components_ui as components_ui
 
 class eSocialConfiguracoes(QMainWindow):
     config_run = Signal(dict)
@@ -56,7 +57,7 @@ class eSocialConfiguracoes(QMainWindow):
 
     def salvar(self):
         if self.__edit_diretorio_trabalho.text()=="":
-            self.alerta("Preencha o diretório de trabalho.","Atenção")
+            components_ui.message_error("Preencha o diretório de trabalho.","Atenção")
             self.busca_diretorio()
 
         dados = {

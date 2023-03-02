@@ -107,7 +107,7 @@ class eSocialXML():
             # Solicita todos os eventos da data atual até o início do e-Social (01/01/2018) em intervalos de tempo pré-definidos
             solicitacoes = 0
             while data_inicio_periodo > data_inicio_esocial:
-                #self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+                self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
 
                 data_fim_periodo = data_inicio_periodo - timedelta(days=1)
                 data_inicio_periodo = data_inicio_periodo - timedelta(days=intervalo_dias)
@@ -115,7 +115,7 @@ class eSocialXML():
                 solicitacoes = solicitacoes + 1
 
             data_inicio_periodo = data_inicio_esocial
-            #self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+            self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
 
             solicitacoes = solicitacoes + 1
 
@@ -595,7 +595,7 @@ class eSocialXML():
         
         print("Relacionando rubricas")
         for s1010 in tqdm(self.dicionario_s1010):
-            inscricao = self.dicionario_s1010.get(s1010).get('ideEmpregador').get('nrInsc')
+            inscricao = self.completar_cnpj(self.dicionario_s1010.get(s1010).get('ideEmpregador').get('nrInsc'))
             
             if(inscricao==empresa):
                 codigo = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('ideRubrica').get('codRubr')

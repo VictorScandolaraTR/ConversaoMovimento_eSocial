@@ -205,10 +205,10 @@ class eSocial(QMainWindow):
         inscricao = self.__edit_inscricao.text()
 
         if (inscricao == ""):
-            self.alerta("Preencha o campo inscrição.","Erro ao adicionar")
+            components_ui.message_error(self.__widget,"Preencha o campo inscrição.")
             return
         if (inscricao in self.__empresas_em_uso):
-            self.alerta("Empresa já cadastrada.", "Erro ao adicionar")
+            components_ui.message_error(self.__widget,"Empresa já cadastrada.")
             self.__edit_inscricao.clear()
             return
 
@@ -247,9 +247,6 @@ class eSocial(QMainWindow):
         self.atualiza_status("Excluindo...")
         inscricao = self.__tabela_empresas.selectedItems()[0].text()
 
-        conexao = self.__engine.connect()
-        conexao.execute(f"DELETE FROM EMPRESAS WHERE inscricao = {inscricao}")
-
         os.system(f"del /q \"{self.__diretorio_trabalho}/{inscricao}/downloads\"")
         os.system(f"del /q \"{self.__diretorio_trabalho}/{inscricao}/eventos\"")
         os.system(f"del /q \"{self.__diretorio_trabalho}/{inscricao}/importar\"")
@@ -258,6 +255,9 @@ class eSocial(QMainWindow):
         os.system(f"rmdir \"{self.__diretorio_trabalho}/{inscricao}/eventos\"")
         os.system(f"rmdir \"{self.__diretorio_trabalho}/{inscricao}/importar\"")
         os.system(f"rmdir \"{self.__diretorio_trabalho}/{inscricao}\"")
+
+        conexao = self.__engine.connect()
+        conexao.execute(f"DELETE FROM EMPRESAS WHERE inscricao = {inscricao}")
 
         self.__empresas, self.__empresas_em_uso = self.carrega_empresas()
         self.atualiza_tabela_empresas()
@@ -310,7 +310,7 @@ class eSocial(QMainWindow):
 
     def seleciona_registro(self):
         if self.__diretorio_trabalho=="":
-            self.alerta("Configure os parâmetros de conexão antes de avançar.")
+            components_ui.message_error(self.__widget,"Configure os parâmetros de conexão antes de avançar.")
             self.configura_conexoes()
             return
         indice = self.__tabela_empresas.selectedItems()[0].row()
@@ -377,7 +377,7 @@ class eSocial(QMainWindow):
             "1- Copie todos os arquivos XML para um diretório\n"\
             "2- Certifique-se de que nesta pasta estejam apenas os arquivos XML\n\n"\
             "Será aberta uma janela para solicitar que você informe a localização da pasta dos eventos."
-        self.alerta(mensagem_alerta)
+        components_ui.message_info(self.__widget,mensagem_alerta)
         caminho = components.ask_directory(self.__widget, "Selecione a pasta com os arquivos XML")
 
         os.system(f"del /q \"{esocial.DIRETORIO_XML}\"")
@@ -398,7 +398,7 @@ class eSocial(QMainWindow):
         mensagem_alerta = "IMPORTANTE!\n"\
             "Será aberto um navegador no portal e-Social para que você selecione o certificado da empresa correta para autenticação.\n"\
             "Após a autenticação, o navegador será minimizado e será encerrado automaticamente após o fim do processo."
-        self.alerta(mensagem_alerta)
+        components_ui.message_info(self.__widget,mensagem_alerta)
 
         lotes, periodos_consultados = esocial.baixar_dados_esocial()
 
@@ -428,15 +428,14 @@ class eSocial(QMainWindow):
             )
         
             self.atualiza_status("Lendo informações...")
-            #esocial.extrair_arquivos_xml()
+            esocial.extrair_arquivos_xml()
             esocial.carregar_informacoes_xml()
 
             self.atualiza_status("Dados carregados do e-Social","E")
             self.seleciona_registro()
         else:
             mensagem_alerta = f"Estamos enfrentando dificuldade em acessar o portal e-Social.\nFavor tentar novamente mais tarde."
-            titulo = "Erro ao consultar informações do portal e-Social"
-            self.alerta(mensagem_alerta,titulo)
+            components_ui.message_error(self.__widget,mensagem_alerta)
 
             self.atualiza_status("Erro ao baixar dados do e-Social")
 
