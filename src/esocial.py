@@ -59,43 +59,18 @@ class eSocialXML():
         create_folder(self.DIRETORIO_RPA)
         create_folder(self.DIRETORIO_IMPORTAR)
 
-    def carrega_parametros(self):
-        """
-        Carrega os parametros utilizados do banco SQLite
-        """
-        diretorio_config_database = os.path.dirname(self.DIRETORIO_RAIZ)
-        engine = create_engine(f"sqlite:///{diretorio_config_database}/operacao.db")
+    def solicita_arquivos_periodo(self, navegador: webdriver.Chrome, data_inicial: datetime, data_final: datetime):
+        print(f"Solicitando arquivos. Período {data_inicial.strftime('%d/%m/%Y')} - {data_final.strftime('%d/%m/%Y')}")
 
-        df = pd.read_sql(f'SELECT * FROM EMPRESAS WHERE inscricao = {self.__inscricao}', con=engine)
-        for index in range(len(df)):
-            self.base_dominio = df.loc[index, "base_dominio"]
-            self.usuario_dominio = df.loc[index, "usuario_dominio"]
-            self.senha_dominio = df.loc[index, "senha_dominio"]
-            self.empresa_padrao_rubricas = df.loc[index, "empresa_padrao_rubricas"]
-            self.usuario_esocial = df.loc[index, "usuario_esocial"]
-            self.senha_esocial = df.loc[index, "senha_esocial"]
-            self.certificado_esocial = df.loc[index, "certificado_esocial"]
-            self.tipo_certificado_esocial = df.loc[index, "tipo_certificado_esocial"]
-            self.usuario_sgd = df.loc[index, "usuario_sgd"]
-            self.senha_sgd = df.loc[index, "senha_sgd"]
+        navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Solicitacao')
+        navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Todos os eventos entregues")
 
-    def salvar_parametros(self):
-        '''Salva os parâmetros utilizados no arquivo parametros.json'''
-
-        parametros = {
-            "base_dominio": str(self.base_dominio),
-            "usuario_dominio": str(self.usuario_dominio),
-            "senha_dominio": str(self.senha_dominio),
-            "empresa_padrao_rubricas": str(self.empresa_padrao_rubricas),
-            "usuario_esocial": str(self.usuario_esocial),
-            "senha_esocial": str(self.senha_esocial),
-            "certificado_esocial": str(self.certificado_esocial),
-            "tipo_certificado_esocial": str(self.tipo_certificado_esocial)
-        }
-
-        f = open(f"{self.DIRETORIO_RAIZ}\\parametros.json","w")
-        f.write(json.dumps(parametros))
-        f.close
+        navegador.find_element(By.XPATH, '//*[@id="DataInicial"]').clear()
+        navegador.find_element(By.XPATH, '//*[@id="DataInicial"]').send_keys(data_inicial.strftime('%d/%m/%Y'))
+        navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').click()
+        navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').clear()
+        navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').send_keys(data_final.strftime('%d/%m/%Y'))
+        navegador.find_element(By.XPATH, '//*[@id="btnSalvar"]').click()
 
     def solicitar_dados_esocial(self, navegador: webdriver.Chrome, intervalo_dias: int, periodos = False):
         print("Iniciando cadastro de solicitações")
@@ -226,14 +201,63 @@ class eSocialXML():
     def baixar_dados_esocial(self,periodos = False):
         '''Acessa o portal e-Social com as credenciais necessárias e faz download dos arquivos do período'''
         # # Abrir um navegador em 2º plano
+        os.system(f"del /q \"{self.DIRETORIO_DOWNLOADS}\"")
+        url = "https://www.gov.br/esocial/pt-br"
+        intervalo_dias = 100
+        downloads_folder = os.path.join(os.environ["USERPROFILE"], "Downloads")
+        lotes = {}
+        lotes["status"] = True
+        lotes["Erro"] = 0
+        lotes["Nenhum evento encontrado"] = 0
+        lotes["Disponível para Baixar"] = 0
+
+        try:
+            chrome_options = Options()
+            chrome_options.headless = False
+            navegador = webdriver.Chrome(options=chrome_options, executable_path="bin\\chromedriver.exe")
+
+            navegador.get(url)
+            navegador.find_element(By.XPATH, '/html/body').click()
+            navegador.find_element(By.XPATH, '//*[@id="d597868d-13e8-407b-b56a-feffb4a5d0b1"]/div/p[1]/a/img').click()
+            navegador.find_element(By.XPATH, '//*[@id="login-acoes"]/div[1]/p/button/img').click()
+            navegador.find_element(By.XPATH, '//*[@id="cert-digital"]/a').click()
+            navegador.minimize_window()
+
+            # Aqui precisará de autenticação do certificado
+            solicitacoes, periodos = self.solicitar_dados_esocial(navegador, intervalo_dias, periodos)
+
+            # Consulta resultado das solicitações
+            lista_downloads, lotes, periodos = self.baixar_lotes_esocial(navegador, solicitacoes, lotes)
+
+            if (lotes["Erro"] > 0) | (lotes["Nenhum evento encontrado"] > 0):
+                intervalo_dias = intervalo_dias / 2
+                solicitacoes = self.solicitar_dados_esocial(navegador, intervalo_dias, periodos)
+                lista_downloads_redistribuidos, lotes, periodos = self.baixar_lotes_esocial(navegador, solicitacoes,
+                                                                                            lotes)
+
+                for download in lista_downloads_redistribuidos:
+                    lista_downloads.append(download)
+
+            for item in lista_downloads:
+                print(item)
+                shutil.copy2(f"{downloads_folder}\\{item}.zip", f"{self.DIRETORIO_DOWNLOADS}\\{item}.zip")
+
+            navegador.close()
+        except Exception as e:
+            print(e)
+            navegador.close()
+            lotes['status'] = False
+
+        return lotes, periodos
+        # # Abrir um navegador em 2º plano
         chrome_options = Options()
         chrome_options.headless = False
         chrome_options.add_argument('ignore-certificate-errors')
-        #self.certificado_esocial
+        # self.certificado_esocial
         navegador = webdriver.Chrome(options=chrome_options)
 
         # Abrir um navegador normal (visivel)
-        #navegador = webdriver.Chrome()
+        # navegador = webdriver.Chrome()
 
         navegador.get("https://www.gov.br/esocial/pt-br")
         navegador.find_element(By.XPATH, '/html/body').click()
@@ -248,7 +272,7 @@ class eSocialXML():
         navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Table")
         navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Todos os eventos entregues")
 
-        #ait.press(Keys.ENTER)
+        # ait.press(Keys.ENTER)
 
     def configura_conexao_esocial(self,usuario,senha,certificado,tipo_certificado = "A1"):
         '''Configura conexão da classe com o portal e-Social'''
