@@ -27,10 +27,13 @@ class eSocialXML():
         self.DIRETORIO_RPA = f"{self.DIRETORIO_TRABALHO}/rpa"
         self.DIRETORIO_IMPORTAR = f"{self.DIRETORIO_TRABALHO}/rpa/Importar"
         self.BANCO_SQLITE = f"{self.DIRETORIO_TRABALHO}/rpa/query.db"
-        self.__main_database = f'.\\{diretorio_trabalho}/operacao.db'
+        self.__main_database = f'.\\src\\database\\operacao.db'
 
         year = self.get_year_conversion()
-        self.INIT_COMPETENCE = f'01/01/{year}'
+        self.__year = year
+
+        previus_year = self.get_previus_year_conversion()
+        self.INIT_COMPETENCE = f'01/12/{previus_year}'
         self.END_COMPETENCE = f'01/12/{year}'
 
         self.dicionario_rubricas_dominio = {} # Rubricas Domínio
@@ -1942,10 +1945,12 @@ class eSocialXML():
                 empresa.ano_conversao = year
                 empresa.save()
 
-            return year
+            return str(year)
         except:
-            return get_current_day().year
+            return str(get_current_day().year)
 
+    def get_previus_year_conversion(self):
+        return str(int(self.__year)-1)
 
 def get_incidencia_inss(incidencia):
     """

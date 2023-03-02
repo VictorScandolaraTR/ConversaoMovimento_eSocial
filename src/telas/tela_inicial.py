@@ -554,7 +554,8 @@ class eSocial(QMainWindow):
         usuario_sgd = self.__parametros["usuario_sgd"]
         senha_sgd = self.__parametros["senha_sgd"]
         year = esocial.get_year_conversion()
-        init_competence = f'01/{year}'
+        previus_year = esocial.get_previus_year_conversion()
+        init_competence = f'12/{previus_year}'
         end_competence = f'12/{year}'
 
         # Iniciar o RPA em uma Thread separada para não travar a interface
