@@ -200,7 +200,6 @@ class eSocialXML():
         
     def baixar_dados_esocial(self,periodos = False):
         '''Acessa o portal e-Social com as credenciais necessárias e faz download dos arquivos do período'''
-        # # Abrir um navegador em 2º plano
         os.system(f"del /q \"{self.DIRETORIO_DOWNLOADS}\"")
         url = "https://www.gov.br/esocial/pt-br"
         intervalo_dias = 100
@@ -214,7 +213,7 @@ class eSocialXML():
         try:
             chrome_options = Options()
             chrome_options.headless = False
-            navegador = webdriver.Chrome(options=chrome_options, executable_path="bin\\chromedriver.exe")
+            navegador = webdriver.Chrome(options=chrome_options,executable_path="bin\\chromedriver.exe")
 
             navegador.get(url)
             navegador.find_element(By.XPATH, '/html/body').click()
@@ -224,12 +223,12 @@ class eSocialXML():
             navegador.minimize_window()
 
             # Aqui precisará de autenticação do certificado
-            solicitacoes, periodos = self.solicitar_dados_esocial(navegador, intervalo_dias, periodos)
+            solicitacoes, periodos = self.solicitar_dados_esocial(navegador,intervalo_dias,periodos)
 
             # Consulta resultado das solicitações
             lista_downloads, lotes, periodos = self.baixar_lotes_esocial(navegador, solicitacoes, lotes)
 
-            if (lotes["Erro"] > 0) | (lotes["Nenhum evento encontrado"] > 0):
+            if (lotes["Erro"]>0)|(lotes["Nenhum evento encontrado"]>0):
                 intervalo_dias = intervalo_dias / 2
                 solicitacoes = self.solicitar_dados_esocial(navegador, intervalo_dias, periodos)
                 lista_downloads_redistribuidos, lotes, periodos = self.baixar_lotes_esocial(navegador, solicitacoes,
@@ -249,40 +248,14 @@ class eSocialXML():
             lotes['status'] = False
 
         return lotes, periodos
-        # # Abrir um navegador em 2º plano
-        chrome_options = Options()
-        chrome_options.headless = False
-        chrome_options.add_argument('ignore-certificate-errors')
-        # self.certificado_esocial
-        navegador = webdriver.Chrome(options=chrome_options)
-
-        # Abrir um navegador normal (visivel)
-        # navegador = webdriver.Chrome()
-
-        navegador.get("https://www.gov.br/esocial/pt-br")
-        navegador.find_element(By.XPATH, '/html/body').click()
-        navegador.find_element(By.XPATH, '//*[@id="d597868d-13e8-407b-b56a-feffb4a5d0b1"]/div/p[1]/a/img').click()
-        navegador.find_element(By.XPATH, '//*[@id="login-acoes"]/div[1]/p/button/img').click()
-        navegador.find_element(By.XPATH, '//*[@id="cert-digital"]/a').click()
-
-        # Aqui precisará de autenticação do certificado
-
-        navegador.find_element(By.XPATH, '//*[@id="menuDownload"]').click()
-        navegador.find_element(By.XPATH, '/html/body/div[3]/div[3]/div/div/ul/li[4]/ul/li[2]/a').click()
-        navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Table")
-        navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Todos os eventos entregues")
-
-        # ait.press(Keys.ENTER)
 
     def configura_conexao_esocial(self,usuario,senha,certificado,tipo_certificado = "A1"):
         '''Configura conexão da classe com o portal e-Social'''
         self.usuario_esocial, self.senha_esocial, self.certificado_esocial, self.tipo_certificado_esocial = usuario, senha, certificado, tipo_certificado
-        self.salvar_parametros()
 
     def configura_conexao_dominio(self,banco,usuario,senha,empresa_padrao = "9999"):
         '''Configura conexão da classe com o banco Domínio'''
         self.base_dominio, self.usuario_dominio, self.senha_dominio, self.empresa_padrao_rubricas = banco, usuario, senha, empresa_padrao
-        self.salvar_parametros()
 
     def extrair_arquivos_xml(self):
         '''Extrai os arquivos .zip que foram baixados do Portal e-Social'''
@@ -575,6 +548,9 @@ class eSocialXML():
         
         cnpj = ''.join([str(item) for item in novo])
         return cnpj
+
+    def completar_inscricao(self):
+        self.__inscricao = self.completar_cnpj(self.__inscricao)
 
     def carregar_rubricas_dominio(self):
         '''Carrega rubricas'''
