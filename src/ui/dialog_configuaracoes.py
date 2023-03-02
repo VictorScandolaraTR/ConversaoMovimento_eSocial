@@ -15,117 +15,251 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QGroupBox,
-    QLabel, QLineEdit, QPushButton, QSizePolicy,
-    QWidget)
+from PySide6.QtWidgets import (QApplication, QFrame, QGroupBox, QHBoxLayout,
+    QLineEdit, QMainWindow, QPushButton, QSizePolicy,
+    QSpacerItem, QVBoxLayout, QWidget)
 
-class Ui_dialog_configuracioes(object):
-    def setupUi(self, dialog_configuracioes):
-        if not dialog_configuracioes.objectName():
-            dialog_configuracioes.setObjectName(u"dialog_configuracioes")
-        dialog_configuracioes.resize(551, 323)
-        self.groupBox = QGroupBox(dialog_configuracioes)
-        self.groupBox.setObjectName(u"groupBox")
-        self.groupBox.setGeometry(QRect(10, 10, 531, 111))
-        self.edit_usuario_certificado = QLineEdit(self.groupBox)
-        self.edit_usuario_certificado.setObjectName(u"edit_usuario_certificado")
-        self.edit_usuario_certificado.setGeometry(QRect(120, 20, 113, 20))
-        self.edit_senha_certificado = QLineEdit(self.groupBox)
-        self.edit_senha_certificado.setObjectName(u"edit_senha_certificado")
-        self.edit_senha_certificado.setGeometry(QRect(340, 20, 113, 20))
-        self.edit_caminho_certificado = QLineEdit(self.groupBox)
-        self.edit_caminho_certificado.setObjectName(u"edit_caminho_certificado")
-        self.edit_caminho_certificado.setGeometry(QRect(120, 80, 261, 20))
-        self.combo_tipo_certificado = QComboBox(self.groupBox)
-        self.combo_tipo_certificado.addItem("")
-        self.combo_tipo_certificado.addItem("")
-        self.combo_tipo_certificado.setObjectName(u"combo_tipo_certificado")
-        self.combo_tipo_certificado.setGeometry(QRect(120, 50, 69, 22))
-        self.label = QLabel(self.groupBox)
-        self.label.setObjectName(u"label")
-        self.label.setGeometry(QRect(10, 20, 47, 13))
-        self.label_2 = QLabel(self.groupBox)
-        self.label_2.setObjectName(u"label_2")
-        self.label_2.setGeometry(QRect(270, 20, 61, 16))
-        self.label_3 = QLabel(self.groupBox)
-        self.label_3.setObjectName(u"label_3")
-        self.label_3.setGeometry(QRect(10, 50, 101, 16))
-        self.label_4 = QLabel(self.groupBox)
-        self.label_4.setObjectName(u"label_4")
-        self.label_4.setGeometry(QRect(10, 80, 61, 16))
-        self.btn_busca_certificado = QPushButton(self.groupBox)
-        self.btn_busca_certificado.setObjectName(u"btn_busca_certificado")
-        self.btn_busca_certificado.setGeometry(QRect(380, 80, 75, 23))
-        self.groupBox_2 = QGroupBox(dialog_configuracioes)
-        self.groupBox_2.setObjectName(u"groupBox_2")
-        self.groupBox_2.setGeometry(QRect(10, 130, 531, 141))
-        self.edit_usuario_dominio = QLineEdit(self.groupBox_2)
-        self.edit_usuario_dominio.setObjectName(u"edit_usuario_dominio")
-        self.edit_usuario_dominio.setGeometry(QRect(200, 50, 113, 20))
-        self.edit_banco_dominio = QLineEdit(self.groupBox_2)
+class Ui_MainWindow(object):
+    def setupUi(self, MainWindow):
+        if not MainWindow.objectName():
+            MainWindow.setObjectName(u"MainWindow")
+        MainWindow.resize(520, 495)
+        MainWindow.setMinimumSize(QSize(520, 495))
+        MainWindow.setStyleSheet(u"QMainWindow {\n"
+"    background-color: #cbcbca;\n"
+"}\n"
+"QMenuBar {\n"
+"    background-color: #a8a7a7;\n"
+"    font-size: 14px;\n"
+"}\n"
+"QMenu {\n"
+"    font-size: 14px;\n"
+"}\n"
+"QLabel {\n"
+"    font-size: 13px;\n"
+"}\n"
+"QCheckBox {\n"
+"    font-size: 13px;\n"
+"}\n"
+"QListWidget {\n"
+"    font-size: 13px; \n"
+"}\n"
+"QPushButton {\n"
+"    border-radius: 5px;\n"
+"    background-color: #424242;\n"
+"    color: #f96400;\n"
+"    padding: 5px;\n"
+"    font-size: 13px;\n"
+"    font-weight: bold;\n"
+"    margin-bottom: 10px;\n"
+"    border-radius: 3px;\n"
+"    height: 20px;\n"
+"    border: 1px solid;\n"
+"    padding: 2px;\n"
+"}\n"
+"QPushButton:hover {\n"
+"    background-color: #f96400;\n"
+"    color: #FFFFFF;\n"
+"}\n"
+"QPushButton:disabled {\n"
+"    background-color: #666666;\n"
+"    color: #DDDDDD;\n"
+"}\n"
+"QLineEdit {\n"
+"    margin-bottom: 10px;\n"
+"    border-radius: 3px;\n"
+"    height: 20px;\n"
+"    border: 1px solid;\n"
+"    padding: 2px;\n"
+"}\n"
+"QDateEdit {\n"
+"    margin-bottom: 10px;\n"
+"    border-r"
+                        "adius: 3px;\n"
+"    height: 20px;\n"
+"    border: 1px solid;\n"
+"    padding: 2px;\n"
+"}\n"
+"QHeaderView::section{\n"
+"     background-color: #e6e5e1;\n"
+"}\n"
+"QTableWidget{\n"
+"    background-color:#e8e8e8;\n"
+"}")
+        self.centralwidget = QWidget(MainWindow)
+        self.centralwidget.setObjectName(u"centralwidget")
+        self.verticalLayout = QVBoxLayout(self.centralwidget)
+        self.verticalLayout.setObjectName(u"verticalLayout")
+        self.groupBox_7 = QGroupBox(self.centralwidget)
+        self.groupBox_7.setObjectName(u"groupBox_7")
+        self.horizontalLayout_4 = QHBoxLayout(self.groupBox_7)
+        self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
+        self.edit_diretorio_trabalho = QLineEdit(self.groupBox_7)
+        self.edit_diretorio_trabalho.setObjectName(u"edit_diretorio_trabalho")
+
+        self.horizontalLayout_4.addWidget(self.edit_diretorio_trabalho)
+
+        self.btn_diretorio_trabalho = QPushButton(self.groupBox_7)
+        self.btn_diretorio_trabalho.setObjectName(u"btn_diretorio_trabalho")
+
+        self.horizontalLayout_4.addWidget(self.btn_diretorio_trabalho)
+
+
+        self.verticalLayout.addWidget(self.groupBox_7)
+
+        self.frame_2 = QFrame(self.centralwidget)
+        self.frame_2.setObjectName(u"frame_2")
+        self.frame_2.setFrameShape(QFrame.StyledPanel)
+        self.frame_2.setFrameShadow(QFrame.Raised)
+        self.horizontalLayout_3 = QHBoxLayout(self.frame_2)
+        self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
+        self.frame_4 = QFrame(self.frame_2)
+        self.frame_4.setObjectName(u"frame_4")
+        self.frame_4.setFrameShape(QFrame.StyledPanel)
+        self.frame_4.setFrameShadow(QFrame.Raised)
+        self.verticalLayout_2 = QVBoxLayout(self.frame_4)
+        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
+        self.groupBox_6 = QGroupBox(self.frame_4)
+        self.groupBox_6.setObjectName(u"groupBox_6")
+        self.horizontalLayout_12 = QHBoxLayout(self.groupBox_6)
+        self.horizontalLayout_12.setObjectName(u"horizontalLayout_12")
+        self.edit_banco_dominio = QLineEdit(self.groupBox_6)
         self.edit_banco_dominio.setObjectName(u"edit_banco_dominio")
-        self.edit_banco_dominio.setGeometry(QRect(200, 20, 113, 20))
-        self.edit_senha_dominio = QLineEdit(self.groupBox_2)
+
+        self.horizontalLayout_12.addWidget(self.edit_banco_dominio)
+
+
+        self.verticalLayout_2.addWidget(self.groupBox_6)
+
+        self.groupBox_5 = QGroupBox(self.frame_4)
+        self.groupBox_5.setObjectName(u"groupBox_5")
+        self.horizontalLayout_13 = QHBoxLayout(self.groupBox_5)
+        self.horizontalLayout_13.setObjectName(u"horizontalLayout_13")
+        self.edit_usuario_dominio = QLineEdit(self.groupBox_5)
+        self.edit_usuario_dominio.setObjectName(u"edit_usuario_dominio")
+
+        self.horizontalLayout_13.addWidget(self.edit_usuario_dominio)
+
+
+        self.verticalLayout_2.addWidget(self.groupBox_5)
+
+        self.groupBox_4 = QGroupBox(self.frame_4)
+        self.groupBox_4.setObjectName(u"groupBox_4")
+        self.horizontalLayout_11 = QHBoxLayout(self.groupBox_4)
+        self.horizontalLayout_11.setObjectName(u"horizontalLayout_11")
+        self.edit_senha_dominio = QLineEdit(self.groupBox_4)
         self.edit_senha_dominio.setObjectName(u"edit_senha_dominio")
-        self.edit_senha_dominio.setGeometry(QRect(200, 80, 113, 20))
-        self.label_5 = QLabel(self.groupBox_2)
-        self.label_5.setObjectName(u"label_5")
-        self.label_5.setGeometry(QRect(10, 50, 181, 16))
-        self.label_6 = QLabel(self.groupBox_2)
-        self.label_6.setObjectName(u"label_6")
-        self.label_6.setGeometry(QRect(10, 80, 181, 16))
-        self.label_7 = QLabel(self.groupBox_2)
-        self.label_7.setObjectName(u"label_7")
-        self.label_7.setGeometry(QRect(10, 20, 181, 16))
+        self.edit_senha_dominio.setEchoMode(QLineEdit.PasswordEchoOnEdit)
+
+        self.horizontalLayout_11.addWidget(self.edit_senha_dominio)
+
+
+        self.verticalLayout_2.addWidget(self.groupBox_4)
+
+        self.groupBox_3 = QGroupBox(self.frame_4)
+        self.groupBox_3.setObjectName(u"groupBox_3")
+        self.horizontalLayout_9 = QHBoxLayout(self.groupBox_3)
+        self.horizontalLayout_9.setObjectName(u"horizontalLayout_9")
+        self.edit_empresa_rubricas_dominio = QLineEdit(self.groupBox_3)
+        self.edit_empresa_rubricas_dominio.setObjectName(u"edit_empresa_rubricas_dominio")
+        self.edit_empresa_rubricas_dominio.setEchoMode(QLineEdit.Normal)
+
+        self.horizontalLayout_9.addWidget(self.edit_empresa_rubricas_dominio)
+
+
+        self.verticalLayout_2.addWidget(self.groupBox_3)
+
+        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+
+        self.verticalLayout_2.addItem(self.verticalSpacer)
+
+
+        self.horizontalLayout_3.addWidget(self.frame_4)
+
+        self.frame_5 = QFrame(self.frame_2)
+        self.frame_5.setObjectName(u"frame_5")
+        self.frame_5.setFrameShape(QFrame.StyledPanel)
+        self.frame_5.setFrameShadow(QFrame.Raised)
+        self.verticalLayout_3 = QVBoxLayout(self.frame_5)
+        self.verticalLayout_3.setObjectName(u"verticalLayout_3")
+        self.groupBox_2 = QGroupBox(self.frame_5)
+        self.groupBox_2.setObjectName(u"groupBox_2")
+        self.horizontalLayout_10 = QHBoxLayout(self.groupBox_2)
+        self.horizontalLayout_10.setObjectName(u"horizontalLayout_10")
         self.edit_usuario_sgd = QLineEdit(self.groupBox_2)
         self.edit_usuario_sgd.setObjectName(u"edit_usuario_sgd")
-        self.edit_usuario_sgd.setGeometry(QRect(410, 20, 113, 20))
-        self.label_8 = QLabel(self.groupBox_2)
-        self.label_8.setObjectName(u"label_8")
-        self.label_8.setGeometry(QRect(330, 50, 81, 16))
-        self.label_9 = QLabel(self.groupBox_2)
-        self.label_9.setObjectName(u"label_9")
-        self.label_9.setGeometry(QRect(330, 20, 81, 16))
-        self.edit_senha_sgd = QLineEdit(self.groupBox_2)
+
+        self.horizontalLayout_10.addWidget(self.edit_usuario_sgd)
+
+
+        self.verticalLayout_3.addWidget(self.groupBox_2)
+
+        self.groupBox = QGroupBox(self.frame_5)
+        self.groupBox.setObjectName(u"groupBox")
+        self.horizontalLayout_8 = QHBoxLayout(self.groupBox)
+        self.horizontalLayout_8.setObjectName(u"horizontalLayout_8")
+        self.edit_senha_sgd = QLineEdit(self.groupBox)
         self.edit_senha_sgd.setObjectName(u"edit_senha_sgd")
-        self.edit_senha_sgd.setGeometry(QRect(410, 50, 113, 20))
-        self.label_10 = QLabel(self.groupBox_2)
-        self.label_10.setObjectName(u"label_10")
-        self.label_10.setGeometry(QRect(10, 110, 181, 16))
-        self.edit_empresa_rubricas_dominio = QLineEdit(self.groupBox_2)
-        self.edit_empresa_rubricas_dominio.setObjectName(u"edit_empresa_rubricas_dominio")
-        self.edit_empresa_rubricas_dominio.setGeometry(QRect(200, 110, 113, 20))
-        self.btn_concertar_configuracoes = QPushButton(dialog_configuracioes)
+        self.edit_senha_sgd.setEchoMode(QLineEdit.PasswordEchoOnEdit)
+
+        self.horizontalLayout_8.addWidget(self.edit_senha_sgd)
+
+
+        self.verticalLayout_3.addWidget(self.groupBox)
+
+        self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+
+        self.verticalLayout_3.addItem(self.verticalSpacer_2)
+
+
+        self.horizontalLayout_3.addWidget(self.frame_5)
+
+
+        self.verticalLayout.addWidget(self.frame_2)
+
+        self.frame = QFrame(self.centralwidget)
+        self.frame.setObjectName(u"frame")
+        sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.frame.sizePolicy().hasHeightForWidth())
+        self.frame.setSizePolicy(sizePolicy)
+        self.frame.setFrameShape(QFrame.StyledPanel)
+        self.frame.setFrameShadow(QFrame.Raised)
+        self.horizontalLayout = QHBoxLayout(self.frame)
+        self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.btn_concertar_configuracoes = QPushButton(self.frame)
         self.btn_concertar_configuracoes.setObjectName(u"btn_concertar_configuracoes")
-        self.btn_concertar_configuracoes.setGeometry(QRect(300, 290, 75, 23))
-        self.btn_confirmar_configuracoes = QPushButton(dialog_configuracioes)
+
+        self.horizontalLayout.addWidget(self.btn_concertar_configuracoes)
+
+        self.btn_confirmar_configuracoes = QPushButton(self.frame)
         self.btn_confirmar_configuracoes.setObjectName(u"btn_confirmar_configuracoes")
-        self.btn_confirmar_configuracoes.setGeometry(QRect(400, 290, 75, 23))
 
-        self.retranslateUi(dialog_configuracioes)
+        self.horizontalLayout.addWidget(self.btn_confirmar_configuracoes)
 
-        QMetaObject.connectSlotsByName(dialog_configuracioes)
+
+        self.verticalLayout.addWidget(self.frame)
+
+        MainWindow.setCentralWidget(self.centralwidget)
+
+        self.retranslateUi(MainWindow)
+
+        QMetaObject.connectSlotsByName(MainWindow)
     # setupUi
 
-    def retranslateUi(self, dialog_configuracioes):
-        dialog_configuracioes.setWindowTitle(QCoreApplication.translate("dialog_configuracioes", u"Configura\u00e7\u00f5es", None))
-        self.groupBox.setTitle(QCoreApplication.translate("dialog_configuracioes", u"Configura\u00e7\u00f5es e-Social", None))
-        self.combo_tipo_certificado.setItemText(0, QCoreApplication.translate("dialog_configuracioes", u"A1", None))
-        self.combo_tipo_certificado.setItemText(1, QCoreApplication.translate("dialog_configuracioes", u"A3", None))
-
-        self.label.setText(QCoreApplication.translate("dialog_configuracioes", u"Usu\u00e1rio", None))
-        self.label_2.setText(QCoreApplication.translate("dialog_configuracioes", u"Senha", None))
-        self.label_3.setText(QCoreApplication.translate("dialog_configuracioes", u"Tipo Certificado", None))
-        self.label_4.setText(QCoreApplication.translate("dialog_configuracioes", u"Certificado", None))
-        self.btn_busca_certificado.setText(QCoreApplication.translate("dialog_configuracioes", u"Procurar", None))
-        self.groupBox_2.setTitle(QCoreApplication.translate("dialog_configuracioes", u"Configura\u00e7\u00f5es Dom\u00ednio", None))
-        self.label_5.setText(QCoreApplication.translate("dialog_configuracioes", u"Usu\u00e1rio Dom\u00ednio Folha", None))
-        self.label_6.setText(QCoreApplication.translate("dialog_configuracioes", u"Senha Dom\u00ednio Folha", None))
-        self.label_7.setText(QCoreApplication.translate("dialog_configuracioes", u"Banco de dados Dom\u00ednio Folha", None))
-        self.label_8.setText(QCoreApplication.translate("dialog_configuracioes", u"Senha SGD", None))
-        self.label_9.setText(QCoreApplication.translate("dialog_configuracioes", u"Usu\u00e1rio SGD", None))
-        self.label_10.setText(QCoreApplication.translate("dialog_configuracioes", u"Empresa rubricas", None))
-        self.btn_concertar_configuracoes.setText(QCoreApplication.translate("dialog_configuracioes", u"Cancelar", None))
-        self.btn_confirmar_configuracoes.setText(QCoreApplication.translate("dialog_configuracioes", u"Confirmar", None))
+    def retranslateUi(self, MainWindow):
+        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
+        self.groupBox_7.setTitle(QCoreApplication.translate("MainWindow", u"Diret\u00f3rio de trabalho", None))
+        self.btn_diretorio_trabalho.setText(QCoreApplication.translate("MainWindow", u"Buscar", None))
+        self.groupBox_6.setTitle(QCoreApplication.translate("MainWindow", u"Banco de dados Dom\u00ednio Folha", None))
+        self.edit_banco_dominio.setPlaceholderText("")
+        self.groupBox_5.setTitle(QCoreApplication.translate("MainWindow", u"Usu\u00e1rio Dom\u00ednio Folha", None))
+        self.groupBox_4.setTitle(QCoreApplication.translate("MainWindow", u"Senha Dom\u00ednio Folha", None))
+        self.groupBox_3.setTitle(QCoreApplication.translate("MainWindow", u"Empresa rubricas", None))
+        self.groupBox_2.setTitle(QCoreApplication.translate("MainWindow", u"Usu\u00e1rio SGD", None))
+        self.groupBox.setTitle(QCoreApplication.translate("MainWindow", u"Senha SGD", None))
+        self.btn_concertar_configuracoes.setText(QCoreApplication.translate("MainWindow", u"Cancelar", None))
+        self.btn_confirmar_configuracoes.setText(QCoreApplication.translate("MainWindow", u"Confirmar", None))
     # retranslateUi
 
