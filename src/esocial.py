@@ -91,8 +91,134 @@ class eSocialXML():
         f = open(f"{self.DIRETORIO_RAIZ}\\parametros.json","w")
         f.write(json.dumps(parametros))
         f.close
+
+    def solicitar_dados_esocial(self, navegador: webdriver.Chrome, intervalo_dias: int, periodos = False):
+        print("Iniciando cadastro de solicitações")
+        data_inicio_esocial = datetime.strptime('01/01/2020','%d/%m/%Y')
+
+        if(periodos):
+            # Aqui refaz a solicitação de períodos que deram erro dividindo em períodos menores
+            for periodo in periodos:
+                if (periodos[periodo]["status"] in ["Erro","N"]):
+                    periodos[periodo]["status"] = "Dividido"
+
+                    data_inicial = periodos[periodo]["data_inicial"]
+                    data_final = periodos[periodo]["data_final"]
+
+                    data_limite = datetime.strptime(data_inicial,'%d/%m/%Y')
+                    data_fim_periodo = datetime.strptime(data_final,'%d/%m/%Y')
+                    data_inicio_periodo = data_fim_periodo - timedelta(days=intervalo_dias)
+
+                    solicitacoes = 0
+                    while data_inicio_periodo > data_limite:
+                        self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+
+                        data_fim_periodo = data_inicio_periodo - timedelta(days=1)
+                        data_inicio_periodo = data_inicio_periodo - timedelta(days=intervalo_dias)
+                        
+                        solicitacoes = solicitacoes + 1
+
+                    data_inicio_periodo = data_limite
+                    self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+
+                    solicitacoes = solicitacoes + 1
+        else:
+            data_fim_periodo = datetime.now()
+            data_inicio_periodo = data_fim_periodo - timedelta(days=intervalo_dias)
+                
+            # Solicita todos os eventos da data atual até o início do e-Social (01/01/2018) em intervalos de tempo pré-definidos
+            solicitacoes = 0
+            while data_inicio_periodo > data_inicio_esocial:
+                self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+
+                data_fim_periodo = data_inicio_periodo - timedelta(days=1)
+                data_inicio_periodo = data_inicio_periodo - timedelta(days=intervalo_dias)
+                
+                solicitacoes = solicitacoes + 1
+
+            data_inicio_periodo = data_inicio_esocial
+            self.solicita_arquivos_periodo(navegador, data_inicio_periodo, data_fim_periodo)
+
+            solicitacoes = solicitacoes + 1
+
+        return solicitacoes, periodos
     
-    def baixar_dados_esocial(self):
+    def baixar_lotes_esocial(self, navegador: webdriver.Chrome, solicitacoes: int, lotes: dict):
+        print("---------------------------------------------")
+        print("Fazendo download de e lotes solicitados")
+        print(f"Nº de solicitações: {solicitacoes}")
+        print("Erro: "+str(lotes["Erro"]))
+        print("Nenhum evento encontrado: "+str(lotes["Nenhum evento encontrado"]))
+        print("Disponível para Baixar: "+str(lotes["Disponível para Baixar"]))
+        print("---------------------------------------------")
+        navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
+        navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
+        
+        lista = list(range(1, solicitacoes))
+        lista_downloads = []
+        lista_reprocessamento = []
+        periodos = {}
+        
+        erros_registrados = {}
+        for i in lista:
+            status = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[5]').text
+            numero_solicitacao = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[1]').text
+            periodo = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[4]').text
+            data_inicial = periodo.split("\n")[0].replace(" ","").replace("DataInicial:","")
+            data_final = periodo.split("\n")[1].replace(" ","").replace("DataFinal:","")
+            periodos[numero_solicitacao] = {
+                "data_inicial": data_inicial,
+                "data_final": data_final,
+                "status": status,
+                "indice": i
+            }
+            
+            if(status=="Disponível para Baixar"):
+                lista_downloads.append(numero_solicitacao)
+                navegador.get(f"https://www.esocial.gov.br/portal/Download/Pedido/Download?idPedido={numero_solicitacao}")
+
+                navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
+                navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
+
+                lotes["Disponível para Baixar"] = lotes["Disponível para Baixar"] + 1
+
+            if(status=="Solicitado"):
+                lista_reprocessamento.append(numero_solicitacao)
+                erros_registrados[numero_solicitacao] = 0
+
+        while(len(lista_reprocessamento)>0):
+            for item in lista_reprocessamento:
+
+                navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
+                navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
+                i = periodo[int(item)]["indice"]
+                
+                status = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[5]').text
+                numero_solicitacao = navegador.find_element(By.XPATH, f'//*[@id="DataTables_Table_0"]/tbody/tr[{i}]/td[1]').text
+
+                periodo[item]["status"] = status
+
+                if(status=="Disponível para Baixar"):
+                    lista_downloads.append(numero_solicitacao)
+                    navegador.get(f"https://www.esocial.gov.br/portal/Download/Pedido/Download?idPedido={numero_solicitacao}")
+
+                    navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Consulta')
+                    navegador.find_element(By.XPATH, '//*[@id="conteudo-pagina"]/form/section/div/div[4]/input').click()
+
+                    lista_reprocessamento.remove(item)
+
+                if(status!="Solicitado"):
+                    if(status=="Erro"):
+                        if(erros_registrados[item]<5):
+                            erros_registrados[item] = erros_registrados[item] + 1
+                    else:
+                        print(status)
+                        lotes[status] = lotes[status] + 1
+                        lista_reprocessamento.remove(item)
+
+        return lista_downloads, lotes, periodos
+        
+    def baixar_dados_esocial(self,periodos = False):
         '''Acessa o portal e-Social com as credenciais necessárias e faz download dos arquivos do período'''
         # # Abrir um navegador em 2º plano
         chrome_options = Options()
@@ -467,8 +593,8 @@ class eSocialXML():
         
         print("Relacionando rubricas")
         for s1010 in tqdm(self.dicionario_s1010):
-            inscricao = self.dicionario_s1010.get(s1010).get('ideEmpregador').get('nrInsc')
-
+            inscricao = self.completar_cnpj(self.dicionario_s1010.get(s1010).get('ideEmpregador').get('nrInsc'))
+            
             if(inscricao==empresa):
                 codigo = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('ideRubrica').get('codRubr')
 
