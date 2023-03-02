@@ -1,4 +1,4 @@
-import os, shutil, json, xmltodict, Levenshtein, shutil, hashlib, pyautogui, time
+import os, shutil, json, xmltodict, Levenshtein, shutil, hashlib, time
 from tqdm import tqdm
 from sqlalchemy import create_engine
 import xml.dom.minidom as xml
