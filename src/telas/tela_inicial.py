@@ -511,15 +511,16 @@ class eSocial(QMainWindow):
         relacao_empregados = esocial.relaciona_empregados()
 
         # gerar arquivos cadastrais
+        inscricao_raiz = esocial.get_raiz_cnpj()
         esocial.carregar_informacoes_xml()
-        esocial.gerar_afastamentos_importacao(inscricao, codi_emp, relacao_empregados)
-        esocial.gerar_ferias_importacao(inscricao, codi_emp, relacao_empregados)
+        esocial.gerar_afastamentos_importacao(inscricao_raiz, codi_emp, relacao_empregados)
+        esocial.gerar_ferias_importacao(inscricao_raiz, codi_emp, relacao_empregados)
 
         # gerar arquivos para importação de lançamentos
-        data_vacation = esocial.gerar_arquivos_saida(inscricao, codi_emp, relacao_empregados)
+        data_vacation = esocial.gerar_arquivos_saida(inscricao_raiz, codi_emp, relacao_empregados)
 
         # gerar férias e rescisões que irão ser calculadas pelo RPA
-        esocial.save_rescission(inscricao, codi_emp, relacao_empregados)
+        esocial.save_rescission(inscricao_raiz, codi_emp, relacao_empregados)
         esocial.save_vacation(data_vacation)
 
         # Iniciar RPA
@@ -553,7 +554,8 @@ class eSocial(QMainWindow):
         usuario_sgd = self.__parametros["usuario_sgd"]
         senha_sgd = self.__parametros["senha_sgd"]
         year = esocial.get_year_conversion()
-        init_competence = f'01/{year}'
+        previus_year = esocial.get_previus_year_conversion()
+        init_competence = f'12/{previus_year}'
         end_competence = f'12/{year}'
 
         # Iniciar o RPA em uma Thread separada para não travar a interface

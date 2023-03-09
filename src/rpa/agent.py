@@ -1197,11 +1197,14 @@ class Agent:
                             sleep(1)
 
                     sleep(3)
-                    autoit.control_click('', '[CLASSNN:PBEDIT1902]')
+                    autoit.control_focus('', '[CLASSNN:PBEDIT1902]')
 
                     if data[employee]['data_pagamento'] is not None:
                         self.print_log("info", f"Preenchendo data de pagamento {str(data[employee]['data_pagamento'])}")
-                        self.write(str(data[employee]['data_pagamento']), edit='PBEDIT1902')
+                        number_tabs = get_number_tabs_rescission(str(data[employee]['motivo']))
+                        for _ in range(number_tabs):
+                            autoit.send('{TAB}')
+                        self.write(str(data[employee]['data_pagamento']))
                         sleep(1)
 
                 sleep(1)

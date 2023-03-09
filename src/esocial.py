@@ -27,10 +27,13 @@ class eSocialXML():
         self.DIRETORIO_RPA = f"{self.DIRETORIO_TRABALHO}/rpa"
         self.DIRETORIO_IMPORTAR = f"{self.DIRETORIO_TRABALHO}/rpa/Importar"
         self.BANCO_SQLITE = f"{self.DIRETORIO_TRABALHO}/rpa/query.db"
-        self.__main_database = f'.\\{diretorio_trabalho}/operacao.db'
+        self.__main_database = f'.\\src\\database\\operacao.db'
 
         year = self.get_year_conversion()
-        self.INIT_COMPETENCE = f'01/01/{year}'
+        self.__year = year
+        previus_year = self.get_previus_year_conversion()
+
+        self.INIT_COMPETENCE = f'01/12/{previus_year}'
         self.END_COMPETENCE = f'01/12/{year}'
 
         self.dicionario_rubricas_dominio = {} # Rubricas Domínio
@@ -61,15 +64,14 @@ class eSocialXML():
 
         navegador.get('https://www.esocial.gov.br/portal/download/Pedido/Solicitacao')
         navegador.find_element(By.XPATH, '//*[@id="TipoPedido"]').send_keys("Todos os eventos entregues")
-        
+
         navegador.find_element(By.XPATH, '//*[@id="DataInicial"]').clear()
         navegador.find_element(By.XPATH, '//*[@id="DataInicial"]').send_keys(data_inicial.strftime('%d/%m/%Y'))
         navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').click()
         navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').clear()
         navegador.find_element(By.XPATH, '//*[@id="DataFinal"]').send_keys(data_final.strftime('%d/%m/%Y'))
-
         navegador.find_element(By.XPATH, '//*[@id="btnSalvar"]').click()
-    
+
     def solicitar_dados_esocial(self, navegador: webdriver.Chrome, intervalo_dias: int, periodos = False):
         print("Iniciando cadastro de solicitações")
         data_inicio_esocial = datetime.strptime('01/01/2020','%d/%m/%Y')
@@ -207,7 +209,7 @@ class eSocialXML():
         lotes["Erro"] = 0
         lotes["Nenhum evento encontrado"] = 0
         lotes["Disponível para Baixar"] = 0
-        
+
         try:
             chrome_options = Options()
             chrome_options.headless = False
@@ -233,17 +235,17 @@ class eSocialXML():
 
                 for download in lista_downloads_redistribuidos:
                     lista_downloads.append(download)
-            
+
             for item in lista_downloads:
                 print(item)
                 shutil.copy2(f"{downloads_folder}\\{item}.zip",f"{self.DIRETORIO_DOWNLOADS}\\{item}.zip")
-            
+
             navegador.close()
         except Exception as e:
             print(e)
             navegador.close()
             lotes['status'] = False
-            
+
         return lotes, periodos
 
     def configura_conexao_esocial(self,usuario,senha,certificado,tipo_certificado = "A1"):
@@ -358,7 +360,7 @@ class eSocialXML():
 
     def processar_rubricas(self):
         """
-        Aplica os eventos de alteração de rubrica nas rubricas originais
+        Aplica os eventos de alteração de rúbrica nas rúbricas originais
         """
         dicionario_rubricas = self.dicionario_s1010.get("inclusao")
         dicionario_alteracoes = {}
@@ -549,6 +551,12 @@ class eSocialXML():
     def completar_inscricao(self):
         self.__inscricao = self.completar_cnpj(self.__inscricao)
 
+    def get_raiz_cnpj(self):
+        """
+        Retorna a raiz do CNPJ
+        """
+        return str(self.__inscricao)[:8]
+
     def carregar_rubricas_dominio(self):
         '''Carrega rubricas'''
 
@@ -596,7 +604,7 @@ class eSocialXML():
         print("Relacionando rubricas")
         for s1010 in tqdm(self.dicionario_s1010):
             inscricao = self.completar_cnpj(self.dicionario_s1010.get(s1010).get('ideEmpregador').get('nrInsc'))
-            
+
             if(inscricao==empresa):
                 codigo = self.dicionario_s1010.get(s1010).get('infoRubrica').get('inclusao').get('ideRubrica').get('codRubr')
 
@@ -648,7 +656,7 @@ class eSocialXML():
 
                         if(relacao_dominio_esocial.get(lista_relacoes[0])==None): relacao_dominio_esocial[lista_relacoes[0]] = []
                         relacao_dominio_esocial[lista_relacoes[0]].append(s1010)
-                        
+
                     elif(len(lista_relacoes)>1):
                         print("Multi-relações")
                         linha = [
@@ -921,7 +929,7 @@ class eSocialXML():
         data_lancamentos_eventos = []
         data_lancto_medias = []
 
-        # Completa o de/para de rubricas de cada empresa, com os relacionamentos feitos na planilha
+        # Completa o de/para de rúbricas de cada empresa, com os relacionamentos feitos na planilha
         load_rubrics_relatioship(companies_rubrics, rubrics_relationship, general_rubrics_relationship, uses_company_rubrics)
 
         # coletar datas de pagamento
@@ -937,7 +945,7 @@ class eSocialXML():
 
             complete_competence = line.get('perApur')
             if len(complete_competence) == 4:
-                # preenche o mÃªs 12 e dia como 01
+                # preenche o mês 12 e dia como 01
                 complete_competence += '-12-01'
             else:
                 # preenche o dia como 01
@@ -961,31 +969,30 @@ class eSocialXML():
             if converted_init_competence <= converted_competence <= converted_end_competence:
 
                 # Separa o primeiro prefixo do campo, pois ele indica o tipo da folha
-                dm_dev = str(line.get('ideDmDev')).replace('RESC', '').split('_')[0]
+                dm_dev = str(line.get('ideDmDev')).replace('RESC', '')
 
                 # 11 é evento de folha mensal
                 # 41 é evento de adiantamento
-                # 51 é evento de adiantamento 13Âº
-                # 52 é evento de 13Âº integral
+                # 51 é evento de adiantamento 13º
+                # 52 é evento de 13º integral
                 # 70 é evento de PLR
                 # 42 é evento de folha complementar
-                match dm_dev:
-                    case 'FAD13':
-                        tipo_processo = '51'
-                    case 'F13':
-                        tipo_processo = '52'
-                    case 'FAD':
-                        tipo_processo = '41'
-                    case 'FER':
-                        tipo_processo = '11'
+                if dm_dev.startswith('FAD13'):
+                    tipo_processo = '51'
+                elif dm_dev.startswith('F13'):
+                    tipo_processo = '52'
+                elif dm_dev.startswith('FAD'):
+                    tipo_processo = '41'
+                elif dm_dev.startswith('FER'):
+                    tipo_processo = '11'
 
-                        # Para eventos de férias, precisamos guardar eles para serem
-                        # lançados também ao calcular as férias do empregado
-                        new_format_competence = transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y')
-                        data_vacation.add(valor_informado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_INFORMADO'])
-                        data_vacation.add(valor_calculado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_CALCULADO'])
-                    case _:
-                        tipo_processo = '11'
+                    # Para eventos de férias, precisamos guardar eles para serem
+                    # lançados também ao calcular as férias do empregado
+                    new_format_competence = transform_date(complete_competence, '%Y-%m-%d', '%d/%m/%Y')
+                    data_vacation.add(valor_informado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_INFORMADO'])
+                    data_vacation.add(valor_calculado, [codi_emp, i_empregados, new_format_competence, i_eventos, 'VALOR_CALCULADO'])
+                else:
+                    tipo_processo = '11'
 
                 # se não encontrar a data de pagamento, vê o dia de pagamento da competência
                 # anterior ou posterior
@@ -1061,6 +1068,8 @@ class eSocialXML():
         table.connect(self.BANCO_SQLITE)
         table.delete().execute()
 
+        payment_data = self.load_date_payment_rescission(inscricao, codi_emp, relacao_empregados)
+
         # Carregar dados de aviso prévio
         data_rescission = StorageData()
         for s2299 in self.dicionario_s2299:
@@ -1097,41 +1106,47 @@ class eSocialXML():
             if format_int(line.get_value('I_AFASTAMENTOS')) == 8:
                 codi_emp = line.get_value('CODI_EMP')
                 i_empregados = line.get_value('I_EMPREGADOS')
+                data_demissao = add_day_to_date(line.get_value('DATA_REAL'), '%d/%m/%Y', -1)
+                competence = replace_day_date(data_demissao, '%d/%m/%Y', 1)
 
-                new_line = DominioRescisao()
-                new_line.connect(self.BANCO_SQLITE)
+                converted_init_competence = convert_date(self.INIT_COMPETENCE, '%d/%m/%Y')
+                converted_end_competence = convert_date(self.END_COMPETENCE, '%d/%m/%Y')
+                converted_competence = convert_date(competence, '%d/%m/%Y')
+                if converted_init_competence <= converted_competence <= converted_end_competence:
+                    new_line = DominioRescisao()
+                    new_line.connect(self.BANCO_SQLITE)
 
-                aviso_previo = data_rescission.get([codi_emp, i_empregados, 'AVISO_PREVIO'])
-                tipo = data_rescission.get([codi_emp, i_empregados, 'TIPO'])
+                    aviso_previo = data_rescission.get([codi_emp, i_empregados, 'AVISO_PREVIO'])
+                    tipo = data_rescission.get([codi_emp, i_empregados, 'TIPO'])
 
-                if tipo == 'empregado':
-                    motivo_desligamento = data_rescission.get([codi_emp, i_empregados, 'MOTIVO_DESLIGAMENTO'])
-                else:
-                    # contribuintes vão por padrão no Domí­nio com motivo 99 - Outros
-                    motivo_desligamento = '99'
+                    if tipo == 'empregado':
+                        motivo_desligamento = data_rescission.get([codi_emp, i_empregados, 'MOTIVO_DESLIGAMENTO'])
+                    else:
+                        # contribuintes vão por padrão no Domínio com motivo 99 - Outros
+                        motivo_desligamento = '99'
 
-                new_line.codi_emp = codi_emp
-                new_line.i_empregados = i_empregados
-                new_line.competencia = replace_day_date(line.get_value('DATA_REAL'), '%d/%m/%Y', 1)
-                new_line.data_demissao = line.get_value('DATA_REAL')
-                new_line.motivo = motivos_desligamento_esocial.get(motivo_desligamento)
-                new_line.data_pagamento = ''
+                    new_line.codi_emp = codi_emp
+                    new_line.i_empregados = i_empregados
+                    new_line.data_demissao = add_day_to_date(line.get_value('DATA_REAL'), '%d/%m/%Y', -1)
+                    new_line.competencia = replace_day_date(new_line.data_demissao, '%d/%m/%Y', 1)
+                    new_line.motivo = motivos_desligamento_esocial.get(motivo_desligamento)
+                    new_line.data_pagamento = payment_data.get([i_empregados, new_line.competencia])
 
-                if aviso_previo == 'S':
-                    data_fim_aviso = data_rescission.get([codi_emp, i_empregados, 'DATA_FIM_AVISO'])
-                    formated_data_fim_aviso = transform_date(data_fim_aviso, '%Y-%m-%d', '%d/%m/%Y')
-                    dias_projecao_aviso = difference_between_dates(line.get_value('DATA_REAL'), formated_data_fim_aviso, '%d/%m/%Y')
+                    if aviso_previo == 'S':
+                        data_fim_aviso = data_rescission.get([codi_emp, i_empregados, 'DATA_FIM_AVISO'])
+                        formated_data_fim_aviso = transform_date(data_fim_aviso, '%Y-%m-%d', '%d/%m/%Y')
+                        dias_projecao_aviso = difference_between_dates(line.get_value('DATA_REAL'), formated_data_fim_aviso, '%d/%m/%Y')
 
-                    new_line.aviso_previo = True
-                    new_line.data_aviso = line.get_value('DATA_REAL')
-                    new_line.dias_projecao_aviso = dias_projecao_aviso+1
-                else:
-                    new_line.aviso_previo = False
-                    new_line.data_aviso = ''
-                    new_line.dias_projecao_aviso = ''
+                        new_line.aviso_previo = True
+                        new_line.data_aviso = line.get_value('DATA_REAL')
+                        new_line.dias_projecao_aviso = dias_projecao_aviso+1
+                    else:
+                        new_line.aviso_previo = False
+                        new_line.data_aviso = ''
+                        new_line.dias_projecao_aviso = ''
 
-                if not is_null(new_line.motivo):
-                    new_line.save()
+                    if not is_null(new_line.motivo):
+                        new_line.save()
 
     def save_vacation(self, data_vacation):
         """
@@ -1304,7 +1319,6 @@ class eSocialXML():
         for s2299 in self.dicionario_s2299:
             cnpj_empregador = self.dicionario_s2299[s2299].get("ideEmpregador").get("nrInsc")
             cpf_empregado = self.dicionario_s2299[s2299].get("ideVinculo").get("cpfTrab")
-
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
             if is_null(codi_emp) or is_null(i_empregados):
@@ -1326,7 +1340,6 @@ class eSocialXML():
         for s2399 in self.dicionario_s2399:
             cnpj_empregador = self.dicionario_s2399[s2399].get("ideEmpregador").get("nrInsc")
             cpf_empregado = self.dicionario_s2399[s2399].get("ideTrabSemVinculo").get("cpfTrab")
-
             i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
 
             if is_null(codi_emp) or is_null(i_empregados):
@@ -1356,6 +1369,7 @@ class eSocialXML():
         sequencial_aquisitivos = Sequencial()
         sequencial_gozos = Sequencial()
         check_aquisitivos = StorageData()
+
         payment_data = self.load_date_payment()
 
         for s2230 in self.dicionario_s2230:
@@ -1366,6 +1380,9 @@ class eSocialXML():
                 continue
 
             infos_afastamento = self.dicionario_s2230[s2230].get("infoAfastamento")
+            if infos_afastamento.get('iniAfastamento') is None:
+                continue
+
             motivo = infos_afastamento.get('iniAfastamento').get("codMotAfast")
 
             # Afastamentos de férias é código 15 no eSocial
@@ -1405,6 +1422,7 @@ class eSocialXML():
                 table.set_value('DIAS_GOZADOS', 0)
                 table.set_value('DIAS_ABONO', 0)
                 table.set_value('AVOS_ADQUIRIDOS', 12)
+                table.set_value('ATUALIZOU_DATA_FIM', 'NULO')
                 table.set_value('LIMITE_PARA_GOZO', limite_para_gozo)
 
                 data_foferias_aquisitivos.append(table.do_output())
@@ -1483,58 +1501,91 @@ class eSocialXML():
 
     def load_date_payment(self):
         """
-        Carrega as datas de pagamento do evento 1210
+        Carrega as datas de pagamento do evento 1210 em um dicionário que
+        as chaves são a inscricao da empresa, cpf do empregado e competência
         """
         payment_data = StorageData()
         for s1210 in self.dicionario_s1210:
             insc_empresa = self.dicionario_s1210[s1210].get('ideEmpregador').get('nrInsc')
             cpf_empregado = self.dicionario_s1210[s1210].get('ideBenef').get('cpfBenef')
 
-            competence = self.dicionario_s1210[s1210].get('ideEvento').get('perApur')
             infos_pagto = self.dicionario_s1210[s1210].get('ideBenef').get('infoPgto')
 
             # as vezes as informações de pagamento vem em um unico objeto, e
             # outras vem em uma lista de objetos
             if isinstance(infos_pagto, dict):
                 data_pagto = infos_pagto.get('dtPgto')
-            elif isinstance(infos_pagto, list):
-                data_pagto = ''
+                competence = infos_pagto.get('perRef')
+                payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
 
+            elif isinstance(infos_pagto, list):
                 # percorre a lista de infos sobre o pagamento e coleta a data
                 # de pagamento daquela que for referente a mesma competência
                 for item in infos_pagto:
-                    if item.get('detPgtoFl') is not None:
-                        ref_competence = item.get('detPgtoFl').get('perRef')
+                    if isinstance(item.get('detPgtoFl'), dict):
+                        competence = item.get('detPgtoFl').get('perRef')
+                    elif isinstance(item.get('detPgtoFl'), list):
+                        for item_pagto in item.get('detPgtoFl'):
+                            competence = item_pagto.get('perRef')
                     else:
-                        ref_competence = item.get('perRef')
+                        competence = item.get('perRef')
 
-                    if competence == ref_competence:
-                        data_pagto = item.get('dtPgto')
+                    data_pagto = item.get('dtPgto')
+                    payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
+                
+        return payment_data
 
-                # as vezes em vez da competência vem somente o ano do pagamento
-                # dessa forma coletamos também quando o ano for igual ao da competência
-                if is_null(data_pagto):
-                    for item in infos_pagto:
-                        if item.get('detPgtoFl') is not None:
-                            ref_competence = item.get('detPgtoFl').get('perRef')
-                        else:
-                            ref_competence = item.get('perRef')
+    def load_date_payment_rescission(self, insc_empresa_converter, codi_emp, relacao_empregados):
+        """
+        Carrega as datas de pagamento de rescisão do evento 1210 em um dicionário que
+        as chaves são o código do empregado e competência
+        """
+        payment_data = StorageData()
+        for s1210 in self.dicionario_s1210:
+            insc_empresa = self.dicionario_s1210[s1210].get('ideEmpregador').get('nrInsc')
+            cpf_empregado = self.dicionario_s1210[s1210].get('ideBenef').get('cpfBenef')
 
-                        if not is_null(ref_competence) and len(ref_competence) == 4:
-                            if get_year(competence) == get_year(ref_competence):
-                                data_pagto = item.get('dtPgto')
-                        elif competence == ref_competence:
-                            data_pagto = item.get('dtPgto')
-            else:
-                data_pagto = ''
+            infos_pagto = self.dicionario_s1210[s1210].get('ideBenef').get('infoPgto')
 
-            payment_data.add(data_pagto, [insc_empresa, cpf_empregado, competence])
+            # as vezes as informações de pagamento vem em um unico objeto, e
+            # outras vem em uma lista de objetos
+            if isinstance(infos_pagto, dict):
+                data_pagto = infos_pagto.get('dtPgto')
+                competence = infos_pagto.get('perRef')
+                id_dm_dev = infos_pagto.get('ideDmDev')
+
+                if id_dm_dev is not None and insc_empresa_converter == insc_empresa:
+                    if 'RESC_' in id_dm_dev and 'FAD13' not in id_dm_dev:
+                        i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+                        formated_competence = transform_date(f'{competence}-01', '%Y-%m-%d', '%d/%m/%Y')
+                        formated_data_pagto = transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y')
+                        payment_data.add(formated_data_pagto, [i_empregados, formated_competence])
+
+            elif isinstance(infos_pagto, list):
+                for item in infos_pagto:
+                    data_pagto = item.get('dtPgto')
+                    id_dm_dev = item.get('ideDmDev')
+
+                    if isinstance(item.get('detPgtoFl'), dict):
+                        competence = item.get('detPgtoFl').get('perRef')
+                    elif isinstance(item.get('detPgtoFl'), list):
+                        for item_pagto in item.get('detPgtoFl'):
+                            competence = item_pagto.get('perRef')
+                    else:
+                        competence = item.get('perRef')
+
+                    if id_dm_dev is not None and insc_empresa_converter == insc_empresa:
+                        if 'RESC_' in id_dm_dev and 'FAD13' not in id_dm_dev:
+                            i_empregados = relacao_empregados.get(codi_emp).get(cpf_empregado)
+                            formated_competence = transform_date(f'{competence}-01', '%Y-%m-%d', '%d/%m/%Y')
+                            formated_data_pagto = transform_date(data_pagto, '%Y-%m-%d', '%d/%m/%Y')
+                            payment_data.overwrite(formated_data_pagto, [i_empregados, formated_competence])
 
         return payment_data
 
     def generate_rubricas_esocial(self, generate_rubrics):
         """
-        Alimenta o cadastro da rÃºbrica com os campos que vem do eSocial
+        Alimenta o cadastro da rúbrica com os campos que vem do eSocial
         """
         rubrics_importation = []
         for rubric in generate_rubrics:
@@ -1564,7 +1615,7 @@ class eSocialXML():
 
     def read_companies_rubrics(self, inscricao, codi_emp, handle_lauch_rubrics):
         """
-        Retorna um dicionÃ¡rio de quais empresas utilizam determinada rÃºbrica
+        Retorna um dicionário de quais empresas utilizam determinada rúbrica
         """
         companies_rubrics = {}
 
@@ -1586,7 +1637,7 @@ class eSocialXML():
 
     def handle_lauch_rubrics(self):
         """
-        Faz um tratamento inicial nos dados dos eventos S-1200 para deixÃ¡-los todos no mesmo padrÃ£o
+        Faz um tratamento inicial nos dados dos eventos S-1200 para deixá-los todos no mesmo padrão
         """
         new_data = []
         for s1200 in self.dicionario_s1200:
@@ -1623,10 +1674,40 @@ class eSocialXML():
 
     def read_rescission_rubrics(self, handle_lauch_rubrics):
         """
-        Em alguns eventos S-2299 vem informadas algumas verbas rescisÃ³rias, entÃ£o juntamos essas verbas
-        na lista de lanÃ§amentos que precisam ser feitos
+        Em alguns eventos S-2299 vem informadas algumas verbas rescisórias, então juntamos essas verbas
+        na lista de lançamentos que precisam ser feitos
         """
+        # Checa se existem eventos de retificação
+        check_retificacao = StorageData()
         for s2299 in self.dicionario_s2299:
+            infos_pagto = self.dicionario_s2299[s2299].get('infoDeslig').get('verbasResc')
+            inscricao_empresa = self.dicionario_s2299[s2299].get('ideEmpregador').get('nrInsc')
+            cpf_trabalhador = self.dicionario_s2299[s2299].get('ideVinculo').get('cpfTrab')
+            data_retificacao = format_date(str(s2299)[17:31], '%Y%m%d%H%M%S')
+
+            if infos_pagto is not None:
+
+                items_to_handle = []
+                if isinstance(infos_pagto.get('dmDev'), list):
+                    items_to_handle.extend(infos_pagto.get('dmDev'))
+                else:
+                    items_to_handle.append(infos_pagto.get('dmDev'))
+
+                for item in items_to_handle:
+                    ide_dm_dev = item.get('ideDmDev')
+
+                    if not check_retificacao.exist([inscricao_empresa, cpf_trabalhador, ide_dm_dev]):
+                        check_retificacao.add(str(s2299), [inscricao_empresa, cpf_trabalhador, ide_dm_dev, 'id'])
+                        check_retificacao.add(data_retificacao, [inscricao_empresa, cpf_trabalhador, ide_dm_dev, 'data_retificacao'])
+                    else:
+                        old_data_retificacao = check_retificacao.get([inscricao_empresa, cpf_trabalhador, ide_dm_dev, 'data_retificacao'])
+                        if data_retificacao > old_data_retificacao:
+                            check_retificacao.overwrite(str(s2299), [inscricao_empresa, cpf_trabalhador, ide_dm_dev, 'id'])
+                            check_retificacao.overwrite(data_retificacao, [inscricao_empresa, cpf_trabalhador, ide_dm_dev, 'data_retificacao'])
+
+        for s2299 in self.dicionario_s2299:
+            inscricao_empresa = self.dicionario_s2299[s2299].get('ideEmpregador').get('nrInsc')
+            cpf_trabalhador = self.dicionario_s2299[s2299].get('ideVinculo').get('cpfTrab')
             infos_pagto = self.dicionario_s2299[s2299].get('infoDeslig').get('verbasResc')
 
             if infos_pagto is not None:
@@ -1649,9 +1730,14 @@ class eSocialXML():
                         events_to_handle.append(infos_events)
 
                     for line in events_to_handle:
+                        # se for um evento que houve retificação, grava somente o evento retificado mais recente
+                        id_recibo = check_retificacao.get([inscricao_empresa, cpf_trabalhador, dm_dev, 'id'])
+                        if s2299 != id_recibo:
+                            continue
+
                         new_line = dict()
-                        new_line['nrInsc'] = self.dicionario_s2299[s2299].get('ideEmpregador').get('nrInsc')
-                        new_line['cpfTrab'] = self.dicionario_s2299[s2299].get('ideVinculo').get('cpfTrab')
+                        new_line['nrInsc'] = inscricao_empresa
+                        new_line['cpfTrab'] = cpf_trabalhador
                         new_line['perApur'] = get_competence(self.dicionario_s2299[s2299].get('infoDeslig').get('dtDeslig'))
                         new_line['ideDmDev'] = dm_dev
                         new_line['codRubr'] = line.get('codRubr')
@@ -1662,7 +1748,7 @@ class eSocialXML():
 
     def complete_data_rubrics(self, rubrics_esocial, companies_rubrics, rubrics_relationship, rubrics_averages):
         """
-        Complementa a tabela de rubricas com alguma equivalente do contábil, e gera também as bases de cálculo
+        Complementa a tabela de rúbricas com alguma equivalente do contábil, e gera também as bases de cálculo
         e fórmulas necessárias
         """
         # campos que virão dos dados do eSocial
@@ -1703,7 +1789,7 @@ class eSocialXML():
                         natureza_folha_mensal_dominio, index_rubric = self.search_similar_rubric(line_rubric, data_rubrics)
                         if index_rubric:
 
-                            # copiar campos da rubrica do Domí­nio
+                            # copiar campos da rubrica do Domínio
                             for column in data_rubrics[natureza_folha_mensal_dominio][index_rubric]:
                                 column_value = data_rubrics[natureza_folha_mensal_dominio][index_rubric][column]
                                 if not is_null(column_value) and str(column_value) != 'None':
@@ -1735,7 +1821,7 @@ class eSocialXML():
                         table.set_value('I_EVENTOS', i_eventos_importation)
                         table.set_value('CODIGO_ESOCIAL', codigo_esocial)
 
-                        # salva o relacionamento da rubrica
+                        # salva o relacionamento da rúbrica
                         rubrics_relationship.add(i_eventos_importation, [str(codi_emp_eve), str(i_eventos)])
 
                         # se tiver incidência no IRRF, marca a rubrica para compor a DIRF
@@ -1746,7 +1832,7 @@ class eSocialXML():
                             table.set_value('SOMA_INF_REN', 'N')
                             table.set_value('REND_TRIBUTAVEIS', '0')
 
-                        # preenche alguns campos padrões para a rubrica
+                        # preenche alguns campos padrões para a rúbrica
                         for key in campos_padrao_rubrica.keys():
                             if is_null(table.get_value(key)):
                                 table.set_value(key, campos_padrao_rubrica.get(key))
@@ -1779,7 +1865,7 @@ class eSocialXML():
                             table_formula.set_value('FIL4', rubric_formula.get('FIL4'))
                             rubrics_formula.append(table_formula.do_output())
 
-                        # gera as bases de cálculo para a rubrica
+                        # gera as bases de cálculo para a rúbrica
                         incidencia_inss = table.get_value('CODIGO_INCIDENCIA_INSS_ESOCIAL')
                         incidencia_irrf = table.get_value('CODIGO_INCIDENCIA_IRRF_ESOCIAL')
                         incidencia_fgts = table.get_value('CODIGO_INCIDENCIA_FGTS_ESOCIAL')
@@ -1862,7 +1948,7 @@ class eSocialXML():
 
     def search_similar_rubric(self, rubric, data_rubrics):
         """
-        Procura uma rubrica da Domínio o mais similar possível com a rubrica da importação
+        Procura uma rúbrica da Domínio o mais similar possível com a rúbrica da importação
         e retorna os campos NATUREZA_FOLHA_MENSAL e I_EVENTOS da rubrica encontrada
         """
         natureza_folha_mensal_dominio = ''
@@ -1876,7 +1962,7 @@ class eSocialXML():
             'CODIGO_INCIDENCIA_SINDICAL_ESOCIAL'
         ]
 
-        # Vai checando qual a rubrica com mais tem campos iguais
+        # Vai checando qual a rúbrica com mais tem campos iguais
         natureza_folha_mensal = rubric.get('NATUREZA_FOLHA_MENSAL')
         if str(natureza_folha_mensal) not in 'NULO' and natureza_folha_mensal in data_rubrics.keys():
             if len(data_rubrics[natureza_folha_mensal]) > 1:
@@ -1942,10 +2028,13 @@ class eSocialXML():
                 empresa.ano_conversao = year
                 empresa.save()
 
-            return year
+            return str(year)
         except:
-            return get_current_day().year
+            return str(get_current_day().year)
 
+
+    def get_previus_year_conversion(self):
+        return str(int(self.__year)-1)
 
 def get_incidencia_inss(incidencia):
     """
@@ -2039,7 +2128,7 @@ def get_all_incidencias(tipo):
 
 def ignore_base_calc(base, base_calc):
     """"
-    Função para validar se a base de calculo à uma base referente a IRRF, INSS, FGTS ou Sindical
+    Função para validar se a base de calculo é uma base referente a IRRF, INSS, FGTS ou Sindical
     """
     if base in 'IRRF':
         if int(base_calc) in i_cadbases_irrf:
@@ -2061,7 +2150,7 @@ def ignore_base_calc(base, base_calc):
 
 def is_a_valid_base(incidencia_irrf, incidencia_inss, incidencia_fgts, incidencia_sindical, i_cadbases):
     """
-    Valida se o código da base está valida de acordo com a incidência da rubrica
+    Valida se o código da base está valida de acordo com a incidência da rúbrica
     """
     # se tiver desmarcada a incidência de IRRF, retira as bases de calculo referente ao IRRF
     if not is_null(incidencia_irrf):
@@ -2138,3 +2227,4 @@ def get_codi_emp(engine, inscricao):
         codi_emp = df.loc[index, "codi_emp"]
 
     return codi_emp
+
