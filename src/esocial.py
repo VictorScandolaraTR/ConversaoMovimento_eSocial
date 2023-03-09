@@ -551,6 +551,12 @@ class eSocialXML():
     def completar_inscricao(self):
         self.__inscricao = self.completar_cnpj(self.__inscricao)
 
+    def get_raiz_cnpj(self):
+        """
+        Retorna a raiz do CNPJ
+        """
+        return str(self.__inscricao)[:8]
+
     def carregar_rubricas_dominio(self):
         '''Carrega rubricas'''
 
